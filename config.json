@@ -1,0 +1,12 @@
+{
+  "user_name": "YourName",
+  "assistant_name": "ChatGPT",
+  "input_mode": "directory",
+  "input_path": "C:\\GitHubProjects\\ChatGPT_Conversations_To_Markdown\\JsonFiles",
+  "output_directory": "C:\\GitHubProjects\\ChatGPT_Conversations_To_Markdown\\MarkdownFiles",
+  "date_format": "%m-%d-%Y",
+  "file_name_format": "{title}",
+  "include_date": true,
+  "message_separator": "\n\n",
+  "skip_empty_messages": true
+}
