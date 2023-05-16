@@ -30,6 +30,11 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
+5. Install the required Python dependencies:
+```
+pip install tqdm
+```
+
 ## Usage
 1. Update the config.json file with your desired settings, such as user and assistant names, input and output paths, and other formatting options.
 2. Create your JSON input directory and add the JSON file e.g. conversations.json you received from the export of the ChatGPT conversations to this location. Add this path to your config file.
