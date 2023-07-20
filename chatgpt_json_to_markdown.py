@@ -22,18 +22,39 @@ def process_conversations(data, output_dir, config):
         messages.sort(key=lambda x: x["create_time"] if x["create_time"] is not None else float('-inf'))
 
         # sanitize title to ensure it's a valid filename
-        title = ''.join(c for c in title if c.isalnum() or c in [' ', '_']).rstrip()
-        file_name = f"{config['file_name_format'].format(title=title.replace(' ', '_').replace('/', '_'))}.md"
+        if title:
+            title = ''.join(c for c in title if c.isalnum() or c in [' ', '_']).rstrip()
+        else:
+            title = "Untitled"
+
+        date = ""
+        if messages and messages[0]["create_time"] is not None:
+            date = datetime.fromtimestamp(messages[0]["create_time"]).strftime(config['date_format'])
+
+        file_template = config['file_name_format'].format(
+            title=title.replace(' ', '_').replace('/', '_'),
+            date=date
+        )
+        file_name = f"{file_template}.md"
         file_path = os.path.join(output_dir, file_name)
 
         with open(file_path, "w", encoding="utf-8") as f:
-            if messages and messages[0]["create_time"] is not None and config['include_date']:
-                date = datetime.fromtimestamp(messages[0]["create_time"]).strftime(config['date_format'])
+            if date and config['include_date']:
                 f.write(f"<sub>{date}</sub>{config['message_separator']}")
 
             for message in messages:
                 author_role = message["author"]["role"]
-                content = message["content"]["parts"][0]
+                content = None
+                if 'parts' in message["content"]:
+                    content = message["content"]["parts"][0]
+                if not content and 'text' in message["content"]:
+                    content = message["content"]["text"]
+                if not content and 'result' in message["content"]:
+                    content = message["content"]["result"]
+                if 'parts' not in message["content"] and 'text' not in message["content"] \
+                    and 'result' not in message["content"]:
+                    print(f"Skipping message with no content: {message}")
+                    # exit()
                 author_name = config['user_name'] if author_role == "user" else config['assistant_name']
                 if not config['skip_empty_messages'] or content.strip():
                     f.write(f"**{author_name}**: {content}{config['message_separator']}")
