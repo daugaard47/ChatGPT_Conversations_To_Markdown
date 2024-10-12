@@ -11,9 +11,16 @@ def read_json_file(file_path):
     return data
 
 def process_conversations(data, output_dir, config):
-    for conversation in tqdm(data, desc="Processing conversations"):
-        title = conversation["title"]
-        mapping = conversation["mapping"]
+    for idx, conversation in enumerate(tqdm(data, desc="Processing conversations")):
+        # Check if conversation is a dictionary; skip if not
+        if not isinstance(conversation, dict):
+            print(f"Warning: Skipping non-dict conversation at index {idx}")
+            continue
+
+        # Use a default title if 'title' key is missing
+        title = conversation.get("title", f"Untitled_Conversation_{idx}")
+        
+        mapping = conversation.get("mapping", {})
 
         # Extract messages from the "mapping" key
         messages = [mapping[key]["message"] for key in mapping if mapping[key]["message"] is not None]
@@ -33,10 +40,18 @@ def process_conversations(data, output_dir, config):
 
             for message in messages:
                 author_role = message["author"]["role"]
-                content = message["content"]["parts"][0]
                 author_name = config['user_name'] if author_role == "user" else config['assistant_name']
-                if not config['skip_empty_messages'] or content.strip():
-                    f.write(f"**{author_name}**: {content}{config['message_separator']}")
+
+                # Check if 'content' and 'parts' exist in the message
+                if "content" in message and "parts" in message["content"]:
+                    content = message["content"]["parts"][0]
+                    
+                    # Check if content is a string before applying strip
+                    if isinstance(content, str):
+                        if not config['skip_empty_messages'] or content.strip():
+                            f.write(f"**{author_name}**: {content}{config['message_separator']}")
+                else:
+                    print(f"Warning: 'parts' key missing or content is invalid in message by {author_name}, skipping message.")
 
 def main():
     config_path = "config.json"
