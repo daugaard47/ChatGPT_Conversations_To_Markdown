@@ -12,24 +12,24 @@ def read_json_file(file_path):
 
 def _get_message_content(message):
     """
-    Extracts the content of a message from the message object.
-
-    The format varies depending on the type of message (e.g. standard, browsing etc)
+    Extracts the content of a message from the message object,
+    with handling for various content types and mixed data formats.
     """
     if "parts" in message["content"]:
-        # Standard message
-        content = message["content"]["parts"][0]
-        if len(message["content"]["parts"]) > 1:
-            # Not seen in the wild, but raise an error as the code should change to accomodate this
-            raise ValueError(f"Message has more than one part: {message['content']}")
+        parts = message["content"]["parts"]
+        
+        # Extract and join text content from parts, handling different formats gracefully
+        content = "\n".join(
+            part["text"] if isinstance(part, dict) and "text" in part else str(part) 
+            for part in parts
+        )
     elif "text" in message["content"]:
-        # Opening a website (TODO: may be other plugin types)
         content = message["content"]["text"]
     elif "result" in message["content"]:
-        # Web content (TODO: may be other plugin types)
         content = message["content"]["result"]
     else:
         raise ValueError(f"Unknown message format: {message['content']}")
+    
     return content
 
 def _get_title(title, first_message):
@@ -46,32 +46,37 @@ def _get_title(title, first_message):
     return first_line.rstrip() + "..."
 
 def process_conversations(data, output_dir, config):
-    for idx, conversation in enumerate(tqdm(data, desc="Processing conversations")):
-        # Check if conversation is a dictionary; skip if not
-        if not isinstance(conversation, dict):
-            print(f"Warning: Skipping non-dict conversation at index {idx}")
+    for entry in tqdm(data, desc="Processing conversations"):
+        # Ensure each entry is a dictionary
+        if not isinstance(entry, dict):
+            print(f"Skipping entry, expected dict but got {type(entry).__name__}: {entry}")
             continue
 
-        # Use a default title if 'title' key is missing
-        title = conversation.get("title", f"Untitled_Conversation_{idx}")
-        
-        mapping = conversation.get("mapping", {})
+        # Safely get the title and mapping
+        title = entry.get("title", None)
+        mapping = entry.get("mapping", {})
 
         # Extract messages from the "mapping" key
-        messages = [mapping[key]["message"] for key in mapping if mapping[key]["message"] is not None]
+        messages = [
+            item["message"] 
+            for item in mapping.values() 
+            if isinstance(item, dict) and item.get("message") is not None
+        ]
 
-        # Sort messages by their create_time
-        messages.sort(key=lambda x: x["create_time"] if x["create_time"] is not None else float('-inf'))
+        # Sort messages by their create_time, handling None values
+        messages.sort(key=lambda x: x.get("create_time") or float('-inf'))
 
-        title = _get_title(conversation["title"], messages[0])
-        
-        # sanitize title to ensure it's a valid filename
-        title = ''.join(c for c in title if c.isalnum() or c in [' ', '_']).rstrip()
-        file_name = f"{config['file_name_format'].format(title=title.replace(' ', '_').replace('/', '_'))}.md"
+        # Use the first message to infer the title if it's not available
+        inferred_title = _get_title(title, messages[0] if messages else {"content": {"text": "Untitled"}})
+
+        # Sanitize the title to ensure it's a valid filename
+        sanitized_title = ''.join(c for c in inferred_title if c.isalnum() or c in [' ', '_']).rstrip()
+        file_name = f"{config['file_name_format'].format(title=sanitized_title.replace(' ', '_').replace('/', '_'))}.md"
         file_path = os.path.join(output_dir, file_name)
 
+        # Write messages to file
         with open(file_path, "w", encoding="utf-8") as f:
-            if messages and messages[0]["create_time"] is not None and config['include_date']:
+            if messages and messages[0].get("create_time") and config['include_date']:
                 date = datetime.fromtimestamp(messages[0]["create_time"]).strftime(config['date_format'])
                 f.write(f"<sub>{date}</sub>{config['message_separator']}")
 
@@ -79,17 +84,8 @@ def process_conversations(data, output_dir, config):
                 author_role = message["author"]["role"]
                 content = _get_message_content(message)
                 author_name = config['user_name'] if author_role == "user" else config['assistant_name']
-
-                # Check if 'content' and 'parts' exist in the message
-                if "content" in message and "parts" in message["content"]:
-                    content = message["content"]["parts"][0]
-                    
-                    # Check if content is a string before applying strip
-                    if isinstance(content, str):
-                        if not config['skip_empty_messages'] or content.strip():
-                            f.write(f"**{author_name}**: {content}{config['message_separator']}")
-                else:
-                    print(f"Warning: 'parts' key missing or content is invalid in message by {author_name}, skipping message.")
+                if not config['skip_empty_messages'] or content.strip():
+                    f.write(f"**{author_name}**: {content}{config['message_separator']}")
 
 def main():
     config_path = "config.json"
