@@ -28,9 +28,8 @@ def _get_message_content(message):
     elif "result" in message["content"]:
         content = message["content"]["result"]
     else:
-        # Skip unknown formats instead of raising an error
-        return None
-
+        raise ValueError(f"Unknown message format: {message['content']}")
+    
     return content
 
 def _get_title(title, first_message):
@@ -43,7 +42,7 @@ def _get_title(title, first_message):
     # If there is no title, use the first message
     content = _get_message_content(first_message)
 
-    first_line = content.split("\n", 1)[0] if content else "Untitled"
+    first_line = content.split("\n", 1)[0]
     return first_line.rstrip() + "..."
 
 def process_conversations(data, output_dir, config):
@@ -82,11 +81,8 @@ def process_conversations(data, output_dir, config):
                 f.write(f"<sub>{date}</sub>{config['message_separator']}")
 
             for message in messages:
-                content = _get_message_content(message)
-                if content is None:
-                    continue
-
                 author_role = message["author"]["role"]
+                content = _get_message_content(message)
                 author_name = config['user_name'] if author_role == "user" else config['assistant_name']
                 if not config['skip_empty_messages'] or content.strip():
                     f.write(f"**{author_name}**: {content}{config['message_separator']}")
