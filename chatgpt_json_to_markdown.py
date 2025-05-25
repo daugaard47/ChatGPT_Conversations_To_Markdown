@@ -23,6 +23,8 @@ def _get_message_content(message):
             part["text"] if isinstance(part, dict) and "text" in part else str(part) 
             for part in parts
         )
+    elif "reasoning_status" in message["metadata"]:
+        content = ""
     elif "text" in message["content"]:
         content = message["content"]["text"]
     elif "result" in message["content"]:
