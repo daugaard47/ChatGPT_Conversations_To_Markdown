@@ -53,23 +53,23 @@ def _get_author_name(message, config):
     """
     author_role = message["author"]["role"]
     base_name = config['user_name'] if author_role == "user" else config['assistant_name']
-    
+
     # Handle tool messages
     if author_role == "tool":
         tool_name = message["author"].get("name", "tool")
         return f"Tool ({tool_name})"
-    
+
     # Check for special content types
     content = message.get("content", {})
     recipient = message.get("recipient", "")
-    
+
     # Tool call detection
     if content.get("content_type") == "code":
         if recipient == "web":
             return f"{base_name} (tool call)"
         elif recipient == "web.run":
             return f"{base_name} (tool execution)"
-    
+
     # Other special content types
     if "thoughts" in content:
         return f"{base_name} (thinking)"
@@ -77,7 +77,7 @@ def _get_author_name(message, config):
         return f"{base_name} (reasoning summary)"
     elif content.get("content_type") == "user_editable_context":
         return "System (context)"
-    
+
     return base_name
 
 def _get_title(title, first_message):
