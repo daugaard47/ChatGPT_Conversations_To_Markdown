@@ -47,6 +47,24 @@ def _get_message_content(message):
     
     return content
 
+def _get_author_name(message, config):
+    """
+    Determines the appropriate author name based on message type and role.
+    """
+    author_role = message["author"]["role"]
+    base_name = config['user_name'] if author_role == "user" else config['assistant_name']
+    
+    # Check for special content types
+    content = message.get("content", {})
+    if "thoughts" in content:
+        return f"{base_name} (thinking)"
+    elif content.get("content_type") == "reasoning_recap":
+        return f"{base_name} (reasoning summary)"
+    elif content.get("content_type") == "user_editable_context":
+        return "System (context)"
+    
+    return base_name
+
 def _get_title(title, first_message):
     """
     Return conversation['title'] if it exists, otherwise infer it from the first message
@@ -96,9 +114,8 @@ def process_conversations(data, output_dir, config):
                 f.write(f"<sub>{date}</sub>{config['message_separator']}")
 
             for message in messages:
-                author_role = message["author"]["role"]
                 content = _get_message_content(message)
-                author_name = config['user_name'] if author_role == "user" else config['assistant_name']
+                author_name = _get_author_name(message, config)
                 if not config['skip_empty_messages'] or content.strip():
                     f.write(f"**{author_name}**: {content}{config['message_separator']}")
 

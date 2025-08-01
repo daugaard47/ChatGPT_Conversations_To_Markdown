@@ -3,6 +3,7 @@ ChatGPT Conversations to Markdown is a Python script that converts your exported
 
 ## Features
 * Convert ChatGPT conversations stored in JSON format to Markdown
+* Support for new ChatGPT message formats including internal reasoning and user context
 * Customize user and assistant names using a configuration file
 * Include or exclude date in the output Markdown files
 * Customize the format of file names, dates, and message separators
@@ -48,5 +49,16 @@ python chatgpt_json_to_markdown.py
 ```
 All Done Buddy! You can access your files here: <output_directory>
 ```
+
+## Message Format Support
+
+The script handles various ChatGPT message types and formats them appropriately in the output:
+
+* **Regular messages**: Standard user and assistant conversations
+* **Internal reasoning**: ChatGPT's thinking process appears as "ChatGPT (thinking)"
+* **Reasoning summaries**: Brief reasoning recaps appear as "ChatGPT (reasoning summary)"
+* **User context**: Profile and instruction context appears as "System (context)"
+
+This ensures that newer ChatGPT exports with internal reasoning are fully supported and clearly labeled in the markdown output.
 
 Now you can easily read, share, or archive your ChatGPT conversations in a more human-readable format. Enjoy!
