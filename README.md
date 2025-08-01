@@ -57,6 +57,9 @@ The script handles various ChatGPT message types and formats them appropriately 
 * **Regular messages**: Standard user and assistant conversations
 * **Internal reasoning**: ChatGPT's thinking process appears as "ChatGPT (thinking)"
 * **Reasoning summaries**: Brief reasoning recaps appear as "ChatGPT (reasoning summary)"
+* **Tool calls**: ChatGPT initiating tool usage appears as "ChatGPT (tool call)"
+* **Tool execution**: ChatGPT executing tools appears as "ChatGPT (tool execution)"
+* **Tool results**: Tool response messages appear as "Tool (tool_name)"
 * **User context**: Profile and instruction context appears as "System (context)"
 
 This ensures that newer ChatGPT exports with internal reasoning are fully supported and clearly labeled in the markdown output.
