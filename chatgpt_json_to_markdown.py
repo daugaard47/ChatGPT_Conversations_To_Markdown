@@ -27,6 +27,21 @@ def _get_message_content(message):
         content = message["content"]["text"]
     elif "result" in message["content"]:
         content = message["content"]["result"]
+    elif "thoughts" in message["content"]:
+        # Handle ChatGPT's internal reasoning/thoughts format
+        thoughts = message["content"]["thoughts"]
+        content = "\n".join(
+            f"**{thought.get('summary', 'Thought')}**: {thought.get('content', '')}"
+            for thought in thoughts if isinstance(thought, dict)
+        )
+    elif message["content"].get("content_type") == "reasoning_recap":
+        # Handle reasoning recap messages
+        content = f"*{message['content'].get('content', 'Reasoning completed')}*"
+    elif message["content"].get("content_type") == "user_editable_context":
+        # Handle user context/profile messages - usually system context
+        profile = message["content"].get("user_profile", "")
+        instructions = message["content"].get("user_instructions", "")
+        content = f"*User Context*:\n{profile}\n{instructions}".strip()
     else:
         raise ValueError(f"Unknown message format: {message['content']}")
     
