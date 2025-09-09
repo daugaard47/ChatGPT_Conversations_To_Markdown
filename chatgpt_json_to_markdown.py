@@ -29,10 +29,58 @@ def _get_message_content(message):
         content = message["content"]["text"]
     elif "result" in message["content"]:
         content = message["content"]["result"]
+    elif "thoughts" in message["content"]:
+        # Handle ChatGPT's internal reasoning/thoughts format
+        thoughts = message["content"]["thoughts"]
+        content = "\n".join(
+            f"**{thought.get('summary', 'Thought')}**: {thought.get('content', '')}"
+            for thought in thoughts if isinstance(thought, dict)
+        )
+    elif message["content"].get("content_type") == "reasoning_recap":
+        # Handle reasoning recap messages
+        content = f"*{message['content'].get('content', 'Reasoning completed')}*"
+    elif message["content"].get("content_type") == "user_editable_context":
+        # Handle user context/profile messages - usually system context
+        profile = message["content"].get("user_profile", "")
+        instructions = message["content"].get("user_instructions", "")
+        content = f"*User Context*:\n{profile}\n{instructions}".strip()
     else:
         raise ValueError(f"Unknown message format: {message['content']}")
     
     return content
+
+def _get_author_name(message, config):
+    """
+    Determines the appropriate author name based on message type and role.
+    """
+    author_role = message["author"]["role"]
+    base_name = config['user_name'] if author_role == "user" else config['assistant_name']
+
+    # Handle tool messages
+    if author_role == "tool":
+        tool_name = message["author"].get("name", "tool")
+        return f"Tool ({tool_name})"
+
+    # Check for special content types
+    content = message.get("content", {})
+    recipient = message.get("recipient", "")
+
+    # Tool call detection
+    if content.get("content_type") == "code":
+        if recipient == "web":
+            return f"{base_name} (tool call)"
+        elif recipient == "web.run":
+            return f"{base_name} (tool execution)"
+
+    # Other special content types
+    if "thoughts" in content:
+        return f"{base_name} (thinking)"
+    elif content.get("content_type") == "reasoning_recap":
+        return f"{base_name} (reasoning summary)"
+    elif content.get("content_type") == "user_editable_context":
+        return "System (context)"
+
+    return base_name
 
 def _get_title(title, first_message):
     """
@@ -83,9 +131,8 @@ def process_conversations(data, output_dir, config):
                 f.write(f"<sub>{date}</sub>{config['message_separator']}")
 
             for message in messages:
-                author_role = message["author"]["role"]
                 content = _get_message_content(message)
-                author_name = config['user_name'] if author_role == "user" else config['assistant_name']
+                author_name = _get_author_name(message, config)
                 if not config['skip_empty_messages'] or content.strip():
                     f.write(f"**{author_name}**: {content}{config['message_separator']}")
 
