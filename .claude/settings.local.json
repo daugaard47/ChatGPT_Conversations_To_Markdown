@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(venvScriptspython.exe:*)",
+      "Bash(grep:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

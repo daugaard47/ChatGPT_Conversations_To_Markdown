@@ -1,0 +1,14 @@
+{
+  "user_name": "YourName",
+  "assistant_name": "ChatGPT",
+  "input_mode": "directory",
+  "input_path": "/path/to/JsonFiles",
+  "output_directory": "/path/to/MarkdownFiles",
+  "date_format": "%m-%d-%Y",
+  "file_name_format": "{title}",
+  "include_date": true,
+  "message_separator": "\n\n",
+  "skip_empty_messages": true,
+  "use_frontmatter": true,
+  "use_obsidian_callouts": true
+}
