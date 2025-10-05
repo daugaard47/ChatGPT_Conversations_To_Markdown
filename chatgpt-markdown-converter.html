@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatGPT to Markdown Converter</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); transition: all 0.3s ease; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 20px -10px rgba(102, 126, 234, 0.5); }
+        .mode-card { transition: all 0.2s ease; cursor: pointer; }
+        .mode-card:hover { transform: translateY(-4px); box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.15); }
+        .mode-card.selected { border-color: #667eea; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%); }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen" x-data="converterApp()">
+        
+        <!-- Header -->
+        <div class="gradient-bg text-white py-16">
+            <div class="container mx-auto px-4 max-w-4xl">
+                <div class="flex items-center space-x-3 mb-4">
+                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <h1 class="text-4xl font-bold">ChatGPT to Markdown</h1>
+                </div>
+                <p class="text-xl text-white/90">Convert your ChatGPT conversations into beautiful, organized Markdown files</p>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="container mx-auto px-4 py-12 max-w-4xl">
+            
+            <!-- Setup Form -->
+            <div x-show="!processing && !completed" class="space-y-8">
+                
+                <!-- User Info -->
+                <div class="card p-8">
+                    <div class="flex items-center space-x-3 mb-6">
+                        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        <h2 class="text-2xl font-semibold text-gray-900">User Information</h2>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
+                        <input type="text" x-model="config.user_name" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="Enter your name">
+                    </div>
+                </div>
+
+                <!-- Upload -->
+                <div class="card p-8">
+                    <div class="flex items-center space-x-3 mb-6">
+                        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <h2 class="text-2xl font-semibold text-gray-900">Upload ChatGPT Export</h2>
+                    </div>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-indigo-400 transition-colors">
+                        <input type="file" @change="handleFileUpload($event)" accept=".zip" class="hidden" id="zipFileInput">
+                        <label for="zipFileInput" class="cursor-pointer">
+                            <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+                            </svg>
+                            <p class="text-lg font-medium text-gray-700 mb-2">
+                                <span x-show="!zipFile">Click to upload</span>
+                                <span x-show="zipFile" class="text-green-600 flex items-center justify-center">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    <span x-text="zipFile?.name"></span>
+                                </span>
+                            </p>
+                            <p class="text-sm text-gray-500">ChatGPT export ZIP file</p>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Organization -->
+                <div class="card p-8">
+                    <div class="flex items-center space-x-3 mb-6">
+                        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                        </svg>
+                        <h2 class="text-2xl font-semibold text-gray-900">Organization Mode</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div @click="config.organization_mode = 'flat'" :class="config.organization_mode === 'flat' ? 'selected' : ''" class="mode-card border-2 rounded-lg p-6">
+                            <h3 class="font-semibold text-lg mb-2">Flat</h3>
+                            <p class="text-sm text-gray-600 mb-2">All files in one folder</p>
+                            <p class="text-xs text-gray-500">Best for &lt;100 conversations. Simple structure.</p>
+                            <div class="mt-3 text-xs text-gray-400 font-mono">
+                                📁 MarkdownFiles/<br>
+                                ├─ Conv1.md<br>
+                                ├─ Conv2.md<br>
+                                └─ Assets/
+                            </div>
+                        </div>
+                        <div @click="config.organization_mode = 'category'" :class="config.organization_mode === 'category' ? 'selected' : ''" class="mode-card border-2 rounded-lg p-6">
+                            <h3 class="font-semibold text-lg mb-2">By Category</h3>
+                            <p class="text-sm text-gray-600 mb-2">Starred/Archived/Regular folders</p>
+                            <p class="text-xs text-gray-500">Best for power users who star/archive</p>
+                            <div class="mt-3 text-xs text-gray-400 font-mono">
+                                📁 MarkdownFiles/<br>
+                                ├─ Starred/<br>
+                                ├─ Archived/<br>
+                                ├─ Regular/<br>
+                                └─ Assets/
+                            </div>
+                        </div>
+                        <div @click="config.organization_mode = 'date'" :class="config.organization_mode === 'date' ? 'selected' : ''" class="mode-card border-2 rounded-lg p-6">
+                            <h3 class="font-semibold text-lg mb-2">By Date</h3>
+                            <p class="text-sm text-gray-600 mb-2">Chronological YYYY/MM-Month folders</p>
+                            <p class="text-xs text-gray-500">Best for timeline view, journal-style</p>
+                            <div class="mt-3 text-xs text-gray-400 font-mono">
+                                📁 MarkdownFiles/<br>
+                                ├─ 2025/<br>
+                                │  ├─ 01-January/<br>
+                                │  └─ 02-February/<br>
+                                └─ Assets/
+                            </div>
+                        </div>
+                        <div @click="config.organization_mode = 'hybrid'" :class="config.organization_mode === 'hybrid' ? 'selected' : ''" class="mode-card border-2 rounded-lg p-6 relative">
+                            <div class="absolute top-2 right-2">
+                                <span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded">Recommended</span>
+                            </div>
+                            <h3 class="font-semibold text-lg mb-2">Hybrid</h3>
+                            <p class="text-sm text-gray-600 mb-2">Category + Date combined</p>
+                            <p class="text-xs text-gray-500">Best balance for most users</p>
+                            <div class="mt-3 text-xs text-gray-400 font-mono">
+                                📁 MarkdownFiles/<br>
+                                ├─ Starred/2025/01-Jan/<br>
+                                ├─ Regular/2025/02-Feb/<br>
+                                └─ Assets/
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div class="card p-8">
+                    <div class="flex items-center space-x-3 mb-6">
+                        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                        </svg>
+                        <h2 class="text-2xl font-semibold text-gray-900">Formatting Options</h2>
+                    </div>
+                    <div class="space-y-4">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" x-model="config.use_frontmatter" class="w-5 h-5 text-indigo-600 rounded">
+                            <div><span class="font-medium text-gray-900">YAML Frontmatter</span><p class="text-sm text-gray-500">Metadata headers for Obsidian</p></div>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" x-model="config.use_collapsible_thinking" class="w-5 h-5 text-indigo-600 rounded">
+                            <div><span class="font-medium text-gray-900">Collapsible Thinking</span><p class="text-sm text-gray-500">HTML details for reasoning</p></div>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" x-model="config.include_date" class="w-5 h-5 text-indigo-600 rounded">
+                            <div><span class="font-medium text-gray-900">Include Dates</span><p class="text-sm text-gray-500">Show timestamps</p></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Convert Button -->
+                <div class="text-center">
+                    <button @click="convertConversations()" :disabled="!zipFile || !config.user_name" :class="!zipFile || !config.user_name ? 'opacity-50 cursor-not-allowed' : 'btn-primary cursor-pointer'" class="px-10 py-4 text-white font-semibold text-lg rounded-lg shadow-lg">
+                        Start Conversion
+                    </button>
+                </div>
+            </div>
+
+            <!-- Processing -->
+            <div x-show="processing" class="card p-8">
+                <h2 class="text-2xl font-semibold mb-6">Processing Conversations</h2>
+                <div class="space-y-6">
+                    <div class="flex items-center space-x-3">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        <span x-text="progressMessage" class="text-gray-700"></span>
+                    </div>
+                    <div class="bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div class="bg-gradient-to-r from-indigo-500 to-purple-600 h-full transition-all duration-300" :style="`width: ${progress}%`"></div>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-lg font-medium"><span x-text="processedCount"></span> / <span x-text="totalCount"></span> conversations</p>
+                        <p class="text-sm text-gray-500 mt-2">
+                            <span x-text="audioFilesCopied"></span> audio,
+                            <span x-text="videoFilesCopied"></span> video,
+                            <span x-text="imageFilesCopied"></span> images,
+                            <span x-text="dalleFilesCopied"></span> DALL-E
+                        </p>
+                        <p class="text-sm text-gray-500 mt-1">
+                            <span x-text="urlsExtracted"></span> URLs extracted
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Complete -->
+            <div x-show="completed" class="card p-8 text-center relative overflow-hidden">
+                <div class="absolute inset-0 opacity-5 gradient-bg"></div>
+                <div class="relative z-10">
+                    <div class="inline-flex items-center justify-center w-20 h-20 rounded-full gradient-bg mb-6">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-3xl font-bold text-gray-900 mb-4">Conversion Complete!</h2>
+                    <p class="text-gray-600 mb-8">Your markdown files are ready</p>
+                    
+                    <button @click="downloadZip()" class="btn-primary px-10 py-4 text-white font-semibold rounded-lg shadow-lg mb-6 inline-flex items-center space-x-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        <span>Download Files</span>
+                    </button>
+
+                    <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6 text-left max-w-md mx-auto border border-indigo-100">
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span class="text-gray-600">Conversations:</span><span class="font-semibold" x-text="totalCount"></span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Organization:</span><span class="font-semibold uppercase" x-text="config.organization_mode"></span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Audio:</span><span class="font-semibold" x-text="audioFilesCopied"></span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Video:</span><span class="font-semibold" x-text="videoFilesCopied"></span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">Images:</span><span class="font-semibold" x-text="imageFilesCopied"></span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">DALL-E:</span><span class="font-semibold" x-text="dalleFilesCopied"></span></div>
+                            <div class="flex justify-between"><span class="text-gray-600">URLs Extracted:</span><span class="font-semibold" x-text="urlsExtracted"></span></div>
+                        </div>
+                    </div>
+
+                    <button @click="reset()" class="mt-6 px-6 py-2 bg-white hover:bg-gray-50 text-gray-800 font-medium rounded-lg border-2 border-gray-200 hover:border-indigo-300 transition-all">
+                        Convert Another Export
+                    </button>
+
+                    <!-- Import Instructions -->
+                    <div class="mt-8 text-left max-w-3xl mx-auto">
+                        <details class="bg-white rounded-lg border-2 border-gray-200 p-6">
+                            <summary class="font-semibold text-lg text-gray-900 cursor-pointer hover:text-indigo-600 transition-colors">
+                                📚 How to Import Your Conversations (Click to expand)
+                            </summary>
+
+                            <div class="mt-6 space-y-6">
+                                <!-- Obsidian -->
+                                <div class="border-l-4 border-indigo-500 pl-4">
+                                    <h4 class="font-bold text-gray-900 mb-2 flex items-center">
+                                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/></svg>
+                                        Obsidian (Recommended)
+                                    </h4>
+                                    <ol class="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                                        <li>Extract the ZIP file you just downloaded</li>
+                                        <li>Open your Obsidian vault folder in File Explorer/Finder</li>
+                                        <li>Drag the <code class="bg-gray-100 px-1 rounded">MarkdownFiles</code> folder into your vault</li>
+                                        <li>You can rename <code class="bg-gray-100 px-1 rounded">MarkdownFiles</code> to anything (e.g., "ChatGPT Conversations")</li>
+                                        <li>In Obsidian, press <code class="bg-gray-100 px-1 rounded">Ctrl+R</code> (or <code class="bg-gray-100 px-1 rounded">Cmd+R</code> on Mac) to refresh</li>
+                                        <li>✅ Done! Find your conversations in the sidebar</li>
+                                    </ol>
+                                    <p class="text-xs text-amber-600 mt-2">⚠️ Important: Keep the <code class="bg-gray-100 px-1 rounded">Assets</code> folder with your markdown files!</p>
+                                </div>
+
+                                <!-- Notion -->
+                                <div class="border-l-4 border-gray-400 pl-4">
+                                    <h4 class="font-bold text-gray-900 mb-2 flex items-center">
+                                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M4 4h16v16H4V4zm2 2v12h12V6H6z"/></svg>
+                                        Notion
+                                    </h4>
+                                    <ol class="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                                        <li>Extract the ZIP file you just downloaded</li>
+                                        <li>In Notion, create a new page or database</li>
+                                        <li>Click the <code class="bg-gray-100 px-1 rounded">⋯</code> menu → Import → Markdown</li>
+                                        <li>Select all <code class="bg-gray-100 px-1 rounded">.md</code> files from <code class="bg-gray-100 px-1 rounded">MarkdownFiles</code></li>
+                                        <li>Upload the <code class="bg-gray-100 px-1 rounded">Assets</code> folder separately</li>
+                                        <li>✅ Done! Your conversations are now in Notion</li>
+                                    </ol>
+                                    <p class="text-xs text-amber-600 mt-2">⚠️ Note: Some markdown formatting may not transfer perfectly</p>
+                                </div>
+
+                                <!-- Logseq -->
+                                <div class="border-l-4 border-gray-400 pl-4">
+                                    <h4 class="font-bold text-gray-900 mb-2 flex items-center">
+                                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+                                        Logseq
+                                    </h4>
+                                    <ol class="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                                        <li>Extract the ZIP file you just downloaded</li>
+                                        <li>Open your Logseq graph folder</li>
+                                        <li>Copy the contents of <code class="bg-gray-100 px-1 rounded">MarkdownFiles</code> into your <code class="bg-gray-100 px-1 rounded">pages</code> folder</li>
+                                        <li>Copy the <code class="bg-gray-100 px-1 rounded">Assets</code> folder to your graph root</li>
+                                        <li>✅ Done! Re-index your graph to see the conversations</li>
+                                    </ol>
+                                </div>
+
+                                <!-- Generic Markdown -->
+                                <div class="border-l-4 border-gray-400 pl-4">
+                                    <h4 class="font-bold text-gray-900 mb-2 flex items-center">
+                                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z"/></svg>
+                                        Any Markdown Editor (VS Code, Typora, etc.)
+                                    </h4>
+                                    <ol class="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                                        <li>Extract the ZIP file you just downloaded</li>
+                                        <li>Open <code class="bg-gray-100 px-1 rounded">MarkdownFiles</code> folder in your editor</li>
+                                        <li>✅ Done! Browse and edit your conversations</li>
+                                    </ol>
+                                    <p class="text-xs text-gray-600 mt-2">💡 Tip: The <code class="bg-gray-100 px-1 rounded">Assets</code> folder contains all images and audio files</p>
+                                </div>
+
+                                <!-- General Tips -->
+                                <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mt-6">
+                                    <h4 class="font-bold text-indigo-900 mb-2">💡 Pro Tips:</h4>
+                                    <ul class="text-sm text-indigo-700 space-y-1 list-disc list-inside">
+                                        <li>You can rename the <code class="bg-indigo-100 px-1 rounded">MarkdownFiles</code> folder to anything you want</li>
+                                        <li>The <code class="bg-indigo-100 px-1 rounded">Assets</code> folder MUST stay with your markdown files for images/audio to work</li>
+                                        <li>All image/audio links use relative paths, so everything is portable</li>
+                                        <li>Each conversation has metadata in YAML frontmatter (title, dates, tags)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>All processing happens in your browser. No data uploaded.</p>
+            <p class="mt-1">Press F12 for console debugging.</p>
+        </div>
+    </div>
+
+    <script>
+        function converterApp() {
+            return {
+                config: {
+                    user_name: '',
+                    assistant_name: 'ChatGPT',
+                    organization_mode: 'hybrid',
+                    use_frontmatter: true,
+                    use_collapsible_thinking: true,
+                    include_date: true,
+                    starred_folder: 'Starred',
+                    archived_folder: 'Archived',
+                    regular_folder: 'Regular'
+                },
+                zipFile: null,
+                processing: false,
+                completed: false,
+                progress: 0,
+                progressMessage: '',
+                processedCount: 0,
+                totalCount: 0,
+                audioFilesCopied: 0,
+                imageFilesCopied: 0,
+                dalleFilesCopied: 0,
+                videoFilesCopied: 0,
+                urlsExtracted: 0,
+                citationsFound: 0,
+                outputZip: null,
+
+                async handleFileUpload(event) {
+                    this.zipFile = event.target.files[0];
+                    if (this.zipFile) console.log('ZIP loaded:', this.zipFile.name);
+                },
+
+                // ON-DEMAND SEARCH: Find file starting with fileId (Python glob-style)
+                findAssetFile(fileId, zipContent) {
+                    if (!fileId) return null;
+
+                    const allFiles = Object.keys(zipContent.files);
+
+                    // Search patterns in priority order (matching Python)
+                    const searchStrategies = [
+                        // 1. DALL-E images: dalle-generations/{fileId}-*
+                        {
+                            test: (path) => path.toLowerCase().includes('dalle-generations') &&
+                                           path.includes(fileId),
+                            type: 'dalle'
+                        },
+                        // 2. Audio files: **/audio/{fileId}-*
+                        {
+                            test: (path) => path.toLowerCase().includes('/audio/') &&
+                                           path.includes(fileId),
+                            type: 'audio'
+                        },
+                        // 3. User files: user-*/{fileId}*
+                        {
+                            test: (path) => path.toLowerCase().includes('user-') &&
+                                           path.includes(fileId),
+                            type: 'image'
+                        },
+                        // 4. Root images: {fileId}-* (anywhere)
+                        {
+                            test: (path) => path.includes(fileId),
+                            type: 'image'
+                        }
+                    ];
+
+                    // Try each search strategy in order
+                    for (const strategy of searchStrategies) {
+                        for (const fullPath of allFiles) {
+                            // Skip directories
+                            if (fullPath.endsWith('/')) continue;
+
+                            // Check if file matches this strategy
+                            if (strategy.test(fullPath)) {
+                                const filename = fullPath.substring(fullPath.lastIndexOf('/') + 1);
+                                return { path: fullPath, type: strategy.type };
+                            }
+                        }
+                    }
+
+                    // File not found - this is normal for deleted/web-only assets
+                    return null;
+                },
+
+                async convertConversations() {
+                    if (!this.zipFile || !this.config.user_name) {
+                        alert('Please complete all required fields');
+                        return;
+                    }
+
+                    this.processing = true;
+                    this.progress = 0;
+
+                    try {
+                        console.log('\n=== STARTING CONVERSION ===\n');
+
+                        const zip = new JSZip();
+                        const zipContent = await zip.loadAsync(this.zipFile);
+
+                        // Using on-demand file search (Python-style) - no pre-indexing needed
+
+                        const conversationsFile = zipContent.file('conversations.json');
+                        if (!conversationsFile) throw new Error('conversations.json not found');
+
+                        const conversations = JSON.parse(await conversationsFile.async('string'));
+                        this.totalCount = conversations.length;
+                        this.processedCount = 0;
+                        this.audioFilesCopied = 0;
+                        this.imageFilesCopied = 0;
+                        this.dalleFilesCopied = 0;
+                        this.videoFilesCopied = 0;
+                        this.urlsExtracted = 0;
+                        this.citationsFound = 0;
+
+                        this.outputZip = new JSZip();
+                        const markdownFolder = this.outputZip.folder('MarkdownFiles');
+                        const assetsFolder = markdownFolder.folder('Assets');
+                        const imagesFolder = assetsFolder.folder('Images');
+                        const audioFolder = assetsFolder.folder('Audio');
+                        const videoFolder = assetsFolder.folder('Video');
+                        const dalleFolder = assetsFolder.folder('DALLE');
+
+                        this.progressMessage = 'Converting conversations...';
+
+                        for (const conv of conversations) {
+                            try {
+                                const title = conv.title || 'Untitled';
+                                this.progressMessage = `Converting: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`;
+                                const markdown = await this.generateMarkdown(conv, zipContent, imagesFolder, audioFolder, videoFolder, dalleFolder);
+                                this.outputZip.file(this.getConversationPath(conv), markdown);
+                            } catch (convError) {
+                                console.error(`Error processing conversation "${conv.title || 'Untitled'}":`, convError);
+                                // Continue with next conversation instead of failing completely
+                            }
+                            this.processedCount++;
+                            this.progress = Math.round((this.processedCount / this.totalCount) * 100);
+                        }
+
+                        this.processing = false;
+                        this.completed = true;
+                        console.log('\n=== CONVERSION COMPLETE ===');
+                        console.log(`✅ Processed: ${this.totalCount} conversations`);
+                        console.log(`📁 Assets copied:`);
+                        console.log(`   - Images: ${this.imageFilesCopied}`);
+                        console.log(`   - DALL-E: ${this.dalleFilesCopied}`);
+                        console.log(`   - Audio: ${this.audioFilesCopied}`);
+                        console.log(`   - Video: ${this.videoFilesCopied}`);
+                        console.log(`🔗 URLs extracted: ${this.urlsExtracted}`);
+                        console.log(`\n💾 Ready to download!\n`);
+
+                    } catch (error) {
+                        console.error('ERROR:', error);
+                        let errorMessage = 'An error occurred during conversion';
+
+                        if (error.message.includes('conversations.json')) {
+                            errorMessage = 'conversations.json not found in the ZIP file. Please make sure you uploaded a valid ChatGPT export.';
+                        } else if (error.message.includes('JSON')) {
+                            errorMessage = 'Invalid JSON format in conversations.json. The file may be corrupted.';
+                        } else {
+                            errorMessage = `Error: ${error.message}`;
+                        }
+
+                        alert(errorMessage);
+                        this.processing = false;
+                    }
+                },
+
+                async generateMarkdown(conv, zipContent, imagesFolder, audioFolder, videoFolder, dalleFolder) {
+                    let md = '';
+                    const title = conv.title || 'Untitled';
+
+                    // Get conversation path for relative asset links
+                    const conversationPath = this.getConversationPath(conv);
+
+                    if (this.config.use_frontmatter) {
+                        md += '---\n';
+                        md += `title: "${title}"\n`;
+                        if (conv.create_time) md += `created: ${this.formatTimestamp(conv.create_time)}\n`;
+                        if (conv.update_time) md += `updated: ${this.formatTimestamp(conv.update_time)}\n`;
+                        md += 'tags:\n  - chatgpt\n  - conversation\n---\n\n';
+                    }
+
+                    md += `# ${title}\n\n`;
+                    if (this.config.include_date && conv.create_time) {
+                        md += `<sub>${this.formatDate(conv.create_time)}</sub>\n\n`;
+                    }
+                    md += '---\n\n';
+
+                    const messages = [];
+                    for (const key in conv.mapping || {}) {
+                        const item = conv.mapping[key];
+                        if (item.message && !item.message.metadata?.is_visually_hidden_from_conversation) {
+                            messages.push(item.message);
+                        }
+                    }
+                    messages.sort((a, b) => (a.create_time || 0) - (b.create_time || 0));
+
+                    for (const msg of messages) {
+                        if (msg.author?.role === 'system') continue;
+                        const author = this.getAuthorName(msg);
+                        const content = await this.getMessageContent(msg, zipContent, imagesFolder, audioFolder, videoFolder, dalleFolder, conversationPath);
+                        if (content.trim()) md += `**${author}**:\n\n${content}\n\n`;
+                    }
+
+                    return md;
+                },
+
+                getAuthorName(msg) {
+                    const role = msg.author?.role;
+                    const content = msg.content || {};
+                    const recipient = msg.recipient || '';
+                    const contentType = content.content_type || '';
+
+                    // User messages
+                    if (role === 'user') return this.config.user_name;
+
+                    // Tool messages
+                    if (role === 'tool') return `Tool (${msg.author?.name || 'tool'})`;
+
+                    // System context messages
+                    if (contentType === 'user_editable_context') return 'System (context)';
+
+                    // Assistant messages with special types
+                    const baseName = this.config.assistant_name;
+
+                    // Tool calls/execution (code content with specific recipients)
+                    if (contentType === 'code') {
+                        if (recipient === 'web') return `${baseName} (tool call)`;
+                        if (recipient === 'web.run') return `${baseName} (tool execution)`;
+                    }
+
+                    // Thinking/reasoning
+                    if (content.thoughts) return `${baseName} (thinking)`;
+                    if (contentType === 'reasoning_recap') return `${baseName} (reasoning summary)`;
+
+                    return baseName;
+                },
+
+                async getMessageContent(msg, zipContent, imagesFolder, audioFolder, videoFolder, dalleFolder, conversationPath) {
+                    const content = msg.content || {};
+                    const metadata = msg.metadata || {};
+                    const contentType = content.content_type || '';
+                    const role = msg.author?.role;
+
+                    // Handle tool messages - wrap in collapsible section
+                    if (role === 'tool') {
+                        const toolName = msg.author?.name || 'tool';
+
+                        // Process parts first (DALL-E images are in tool message parts!)
+                        let processedContent = '';
+                        if (content.parts) {
+                            processedContent = await this.processParts(content.parts, zipContent, imagesFolder, audioFolder, videoFolder, dalleFolder, conversationPath);
+                        }
+
+                        // Add text content if present
+                        const toolText = content.text || content.result || '';
+                        const fullContent = [processedContent, toolText].filter(s => s.trim()).join('\n\n');
+
+                        if (this.config.use_collapsible_thinking && fullContent) {
+                            return `<details><summary>🔧 Tool: ${toolName}</summary>\n\n${fullContent}\n\n</details>`;
+                        }
+                        return fullContent;
+                    }
+
+                    // Handle multimodal parts (text, images, audio, video)
+                    if (content.parts) {
+                        return await this.processParts(content.parts, zipContent, imagesFolder, audioFolder, videoFolder, dalleFolder, conversationPath);
+                    }
+
+                    // Handle user context messages
+                    if (contentType === 'user_editable_context') {
+                        const profile = content.user_profile || '';
+                        const instructions = content.user_instructions || '';
+                        let text = '*User Context*:\n';
+                        if (profile) text += `${profile}\n`;
+                        if (instructions) text += `${instructions}\n`;
+                        if (this.config.use_collapsible_thinking) {
+                            return `<details><summary>👤 User Context</summary>\n\n${text.trim()}\n\n</details>`;
+                        }
+                        return text.trim();
+                    }
+
+                    // Handle reasoning recap
+                    if (contentType === 'reasoning_recap') {
+                        const recap = content.content || 'Reasoning completed';
+                        if (this.config.use_collapsible_thinking) {
+                            return `<details><summary>📊 Reasoning Summary</summary>\n\n${recap}\n\n</details>`;
+                        }
+                        return recap;
+                    }
+
+                    // Handle internal thinking/thoughts
+                    if (content.thoughts) {
+                        let text = '';
+                        for (const t of content.thoughts) {
+                            if (t.summary && t.content) text += `**${t.summary}**: ${t.content}\n\n`;
+                        }
+                        if (this.config.use_collapsible_thinking && text) {
+                            return `<details><summary>💭 Internal Reasoning</summary>\n\n${text}</details>`;
+                        }
+                        return text;
+                    }
+
+                    // Handle code content
+                    if (contentType === 'code') {
+                        return '```\n' + (content.text || '') + '\n```';
+                    }
+
+                    // Handle regular text
+                    if (content.text) return content.text;
+                    if (content.result) return content.result;
+
+                    return '';
+                },
+
+                async processParts(parts, zipContent, imagesFolder, audioFolder, videoFolder, dalleFolder, conversationPath) {
+                    if (!parts?.length) return '';
+                    const content = [];
+
+                    for (const part of parts) {
+                        if (typeof part === 'string') {
+                            // Convert URLs to markdown links
+                            const urlRegex = /(https?:\/\/[^\s]+)/g;
+                            let text = part;
+                            text = text.replace(urlRegex, (url) => {
+                                this.urlsExtracted++;
+                                return `[🔗 Link](${url})`;
+                            });
+                            content.push(text);
+                        }
+                        else if (typeof part === 'object') {
+                            const type = part.content_type;
+
+                            // Handle image assets
+                            if (type === 'image_asset_pointer') {
+                                const fileId = this.extractFileId(part.asset_pointer || '');
+                                if (fileId) {
+                                    const result = await this.copyAssetFile(fileId, zipContent, imagesFolder, dalleFolder, null);
+                                    if (result) {
+                                        const folder = result.type === 'dalle' ? 'DALLE' : 'Images';
+                                        const relativePath = this.getRelativeAssetPath(conversationPath, folder);
+                                        content.push(`![Image](${relativePath}${result.filename})`);
+                                    }
+                                }
+                            }
+                            // Handle audio/video assets
+                            else if (type === 'audio_asset_pointer' || type === 'real_time_user_audio_video_asset_pointer') {
+                                // Process audio
+                                let audioPointer = null, audioDuration = null;
+                                if (type === 'audio_asset_pointer') {
+                                    audioPointer = part.asset_pointer || '';
+                                    const meta = part.metadata || {};
+                                    audioDuration = (meta.end || 0) - (meta.start || 0);
+                                } else if (type === 'real_time_user_audio_video_asset_pointer') {
+                                    const audioPtr = part.audio_asset_pointer || {};
+                                    audioPointer = audioPtr.asset_pointer || '';
+                                    const meta = audioPtr.metadata || {};
+                                    audioDuration = (meta.end || 0) - (meta.start || 0);
+                                }
+
+                                if (audioPointer) {
+                                    const fileId = this.extractFileId(audioPointer);
+                                    if (fileId) {
+                                        const result = await this.copyAssetFile(fileId, zipContent, audioFolder, null, null);
+                                        const durText = audioDuration ? ` (${audioDuration.toFixed(1)}s)` : '';
+                                        if (result) {
+                                            const relativePath = this.getRelativeAssetPath(conversationPath, 'Audio');
+                                            content.push(`[🎵 Audio${durText}](${relativePath}${result.filename})`);
+                                        } else {
+                                            content.push(`*[Audio${durText}]*`);
+                                        }
+                                    }
+                                }
+
+                                // Process video (if present in real_time_user_audio_video_asset_pointer)
+                                if (type === 'real_time_user_audio_video_asset_pointer') {
+                                    const videoPtr = part.video_asset_pointer || {};
+                                    const videoPointer = videoPtr.asset_pointer || '';
+                                    if (videoPointer) {
+                                        const fileId = this.extractFileId(videoPointer);
+                                        if (fileId) {
+                                            const result = await this.copyAssetFile(fileId, zipContent, null, null, videoFolder);
+                                            if (result) {
+                                                const relativePath = this.getRelativeAssetPath(conversationPath, 'Video');
+                                                content.push(`[🎬 Video](${relativePath}${result.filename})`);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            else if (part.text) {
+                                // Convert URLs to markdown links
+                                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                                let text = part.text;
+                                text = text.replace(urlRegex, (url) => {
+                                    this.urlsExtracted++;
+                                    return `[🔗 Link](${url})`;
+                                });
+                                content.push(text);
+                            }
+                        }
+                    }
+                    return content.join('\n');
+                },
+
+                extractFileId(assetPointer) {
+                    if (!assetPointer) return null;
+                    let match = assetPointer.match(/file-service:\/\/(file-[a-zA-Z0-9_-]+)/);
+                    if (match) return match[1];
+                    match = assetPointer.match(/sediment:\/\/file_([0-9a-fA-F]+)/);
+                    if (match) return `file_${match[1]}`;
+                    return null;
+                },
+
+                async copyAssetFile(fileId, zipContent, imagesFolder, dalleFolder, videoFolder) {
+                    // Search for file on-demand (Python-style)
+                    const fileInfo = this.findAssetFile(fileId, zipContent);
+                    if (!fileInfo) {
+                        // File not found - normal for deleted/web-only content
+                        return null;
+                    }
+
+                    try {
+                        const file = zipContent.file(fileInfo.path);
+                        if (!file) {
+                            console.warn('File not in ZIP:', fileInfo.path);
+                            return null;
+                        }
+
+                        const data = await file.async('blob');
+                        const filename = fileInfo.path.split('/').pop();
+
+                        // Determine which folder to use based on file type
+                        let folder = null;
+                        if (fileInfo.type === 'dalle' && dalleFolder) {
+                            folder = dalleFolder;
+                        } else if (fileInfo.type === 'video' && videoFolder) {
+                            folder = videoFolder;
+                        } else if (fileInfo.type === 'audio') {
+                            // Audio always uses the first non-null folder passed (should be audioFolder)
+                            folder = imagesFolder || dalleFolder || videoFolder;
+                        } else {
+                            // Images use imagesFolder
+                            folder = imagesFolder;
+                        }
+
+                        if (!folder) {
+                            console.error('No folder specified for file type:', fileInfo.type);
+                            return null;
+                        }
+
+                        folder.file(filename, data);
+
+                        // Update counters
+                        if (fileInfo.type === 'audio') this.audioFilesCopied++;
+                        else if (fileInfo.type === 'video') this.videoFilesCopied++;
+                        else if (fileInfo.type === 'dalle') this.dalleFilesCopied++;
+                        else this.imageFilesCopied++;
+
+                        // Return both filename and type
+                        return { filename, type: fileInfo.type };
+                    } catch (error) {
+                        console.error('Copy error for', fileId, ':', error.message);
+                        return null;
+                    }
+                },
+
+                getConversationPath(conv) {
+                    const title = (conv.title || 'Untitled').replace(/[^a-z0-9_\- ]/gi, '').trim() || 'conversation';
+                    const filename = `${title.replace(/\s+/g, '_')}.md`;
+                    const mode = this.config.organization_mode;
+                    const base = 'MarkdownFiles/';
+                    let category = null;
+                    if (conv.is_starred) category = this.config.starred_folder;
+                    else if (conv.is_archived) category = this.config.archived_folder;
+                    if (mode === 'flat') return base + filename;
+                    if (mode === 'category') return category ? `${base}${category}/${filename}` : `${base}${this.config.regular_folder}/${filename}`;
+                    if (mode === 'date') return `${base}${this.getDateFolder(conv)}/${filename}`;
+                    if (mode === 'hybrid') {
+                        const date = this.getDateFolder(conv);
+                        return category ? `${base}${category}/${date}/${filename}` : `${base}${this.config.regular_folder}/${date}/${filename}`;
+                    }
+                    return base + filename;
+                },
+
+                // Calculate correct relative path from markdown file to asset folder
+                getRelativeAssetPath(conversationPath, assetFolder) {
+                    // Count depth: MarkdownFiles/Starred/2025/01-January/file.md
+                    // Split and subtract 2 (base + filename)
+                    const parts = conversationPath.split('/');
+                    const depth = parts.length - 2; // -1 for base "MarkdownFiles", -1 for filename
+
+                    // Build relative path: ../../../Assets/Images/
+                    const prefix = depth > 0 ? '../'.repeat(depth) : '';
+                    return `${prefix}Assets/${assetFolder}/`;
+                },
+
+                getDateFolder(conv) {
+                    if (!conv.create_time) return 'Unknown';
+                    const d = new Date(conv.create_time * 1000);
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const monthName = d.toLocaleString('default', { month: 'long' });
+                    return `${d.getFullYear()}/${month}-${monthName}`;
+                },
+
+                formatTimestamp(ts) {
+                    return new Date(ts * 1000).toISOString().replace('T', ' ').substring(0, 19);
+                },
+
+                formatDate(ts) {
+                    const d = new Date(ts * 1000);
+                    return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${d.getFullYear()}`;
+                },
+
+                async downloadZip() {
+                    const blob = await this.outputZip.generateAsync({ type: 'blob' });
+                    const now = new Date();
+                    const month = now.toLocaleString('default', { month: 'long' });
+                    const filename = `${month}_${now.getDate()}_${now.getFullYear()}_chatgpt_backup.zip`;
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                },
+
+                reset() {
+                    Object.assign(this, {
+                        zipFile: null, processing: false, completed: false, progress: 0,
+                        progressMessage: '', processedCount: 0, totalCount: 0,
+                        audioFilesCopied: 0, imageFilesCopied: 0, dalleFilesCopied: 0,
+                        videoFilesCopied: 0, urlsExtracted: 0, citationsFound: 0,
+                        outputZip: null
+                    });
+                    document.getElementById('zipFileInput').value = '';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
