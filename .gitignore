@@ -168,3 +168,5 @@ MarkdownFiles/
 
 # User-specific configuration (may contain personal paths)
 config.json
+CLAUDE.md
+.claude/
