@@ -319,6 +319,21 @@
               <label class="flex items-center space-x-3 cursor-pointer">
                 <input
                   type="checkbox"
+                  x-model="config.use_frontmatter"
+                  class="w-5 h-5 text-indigo-600 rounded"
+                />
+                <div>
+                  <span class="font-medium text-gray-900"
+                    >YAML Frontmatter</span
+                  >
+                  <p class="text-sm text-gray-500">
+                    Metadata headers for Obsidian
+                  </p>
+                </div>
+              </label>
+              <label class="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
                   x-model="config.use_collapsible_thinking"
                   class="w-5 h-5 text-indigo-600 rounded"
                 />
