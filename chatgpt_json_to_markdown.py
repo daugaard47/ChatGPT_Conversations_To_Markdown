@@ -430,11 +430,13 @@ def main():
     # Determine the base path for finding attachments
     if config['input_mode'] == 'directory':
         input_base_path = input_path
-        conversations_file = input_path / 'conversations.json'
+        conversations_files = sorted(glob.glob(str(input_path / 'conversations*.json')))
 
-        if conversations_file.exists():
-            data = read_json_file(conversations_file)
-            process_conversations(data, str(output_dir), config, str(input_base_path))
+        if conversations_files:
+            data = []
+            for path in conversations_files:
+                data.extend(read_json_file(path))
+                process_conversations(data, str(output_dir), config, str(input_base_path))
         else:
             print(f"❌ Error: conversations.json not found in {input_path}")
             sys.exit(1)
