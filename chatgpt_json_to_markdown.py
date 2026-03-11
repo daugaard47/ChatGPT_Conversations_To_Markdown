@@ -188,6 +188,8 @@ def _process_message_parts(parts, input_base_path, output_base, config, conversa
 
     # Join content pieces
     content = "\n".join(filter(None, content_pieces))
+    # Strip Unicode Private Use Area characters used as metadata delimiters (fixes #8)
+    content = re.sub(r'[\ue000-\uf8ff]', '', content)
     return content, attachments
 
 def _get_message_content(message, input_base_path, output_base, config, conversation_path):
@@ -242,10 +244,10 @@ def _get_message_content(message, input_base_path, output_base, config, conversa
         return f"```\n{code_text}\n```", []
 
     elif "text" in content_obj:
-        return content_obj["text"], []
+        return re.sub(r'[\ue000-\uf8ff]', '', content_obj["text"]), []
 
     elif "result" in content_obj:
-        return content_obj["result"], []
+        return re.sub(r'[\ue000-\uf8ff]', '', content_obj["result"]), []
 
     else:
         # Unknown format, try to extract something useful
@@ -430,13 +432,15 @@ def main():
     # Determine the base path for finding attachments
     if config['input_mode'] == 'directory':
         input_base_path = input_path
-        conversations_file = input_path / 'conversations.json'
+        conversations_files = sorted(glob.glob(str(input_path / 'conversations*.json')))
 
-        if conversations_file.exists():
-            data = read_json_file(conversations_file)
+        if conversations_files:
+            data = []
+            for path in conversations_files:
+                data.extend(read_json_file(path))
             process_conversations(data, str(output_dir), config, str(input_base_path))
         else:
-            print(f"❌ Error: conversations.json not found in {input_path}")
+            print(f"❌ Error: No conversations*.json files found in {input_path}")
             sys.exit(1)
     else:
         # Single file mode - assume input_path is the conversations.json
