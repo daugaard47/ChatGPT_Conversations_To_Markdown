@@ -27,6 +27,8 @@ That's it! No Python, no terminal, no dependencies. Everything runs locally in y
 
 > 💡 **Privacy First**: All processing happens in your browser. Your conversations never leave your computer.
 
+> ⚠️ **File Size Limit**: The browser converter supports ZIP files up to **2 GB**. For larger exports, use the [Python CLI script](#-python-script-alternative-method) instead.
+
 ---
 
 ## ✨ Features
@@ -67,6 +69,7 @@ That's it! No Python, no terminal, no dependencies. Everything runs locally in y
 - Custom date formatting
 - Custom filename templates
 - Configurable message separators
+- Per-message timestamps with configurable format
 - Skip empty messages option
 - Optional `<details>` formatting mode: markdown (default) or HTML-safe verbatim code block for maximum renderer compatibility
 
