@@ -178,6 +178,8 @@ def run_setup():
     config['date_format'] = '%m-%d-%Y'
     config['file_name_format'] = '{title}'
     config['include_date'] = True
+    config['include_message_timestamps'] = True
+    config['message_timestamp_format'] = '%m-%d-%Y %H:%M'
     config['message_separator'] = '\n\n'
     config['skip_empty_messages'] = True
 
