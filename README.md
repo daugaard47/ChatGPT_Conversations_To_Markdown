@@ -3,6 +3,7 @@
 Transform your exported ChatGPT conversations into beautifully formatted Markdown files optimized for Obsidian and other markdown readers.
 
 **Two ways to use this tool:**
+
 - 🌐 **Browser-Based Converter** (Recommended) - Easy, no installation required
 - 💻 **Python Script** - For terminal users who prefer command-line tools
 
@@ -12,7 +13,7 @@ Both handle the complete ChatGPT export including conversations, images, DALL-E 
 
 ### Browser-Based Converter (No Installation!)
 
-**[📥 Download chatgpt-markdown-converter.html](https://raw.githubusercontent.com/daugaard47/ChatGPT_Conversations_To_Markdown/main/chatgpt-markdown-converter.html)** *(Right-click → Save As)*
+**[📥 Download chatgpt-markdown-converter.html](https://raw.githubusercontent.com/daugaard47/ChatGPT_Conversations_To_Markdown/main/chatgpt-markdown-converter.html)** _(Right-click → Save As)_
 
 **Then:**
 
@@ -31,38 +32,43 @@ That's it! No Python, no terminal, no dependencies. Everything runs locally in y
 ## ✨ Features
 
 ### Core Functionality
-* **Complete ChatGPT Export Processing** - Handles the entire ChatGPT data export including all files and folders
-* **Multimodal Content Support** - Automatically extracts and embeds images, screenshots, and attachments
-* **DALL-E Image Organization** - Separate handling for AI-generated images
-* **Smart File Organization** - Creates conversation-specific folders for all attachments
+
+- **Complete ChatGPT Export Processing** - Handles the entire ChatGPT data export including all files and folders
+- **Multimodal Content Support** - Automatically extracts and embeds images, screenshots, and attachments
+- **DALL-E Image Organization** - Separate handling for AI-generated images
+- **Smart File Organization** - Creates conversation-specific folders for all attachments
 
 ### Message Format Support
-* **Regular Messages** - Standard user and assistant conversations
-* **Audio Messages** - Voice conversations embedded with HTML5 audio players
-* **Internal Reasoning** - ChatGPT's thinking process with special formatting
-* **Reasoning Summaries** - Brief reasoning recaps
-* **Tool Calls & Execution** - ChatGPT tool usage tracking
-* **Tool Results** - External tool response messages
-* **User Context** - Profile and instruction context
-* **Code Blocks** - Properly formatted code with syntax highlighting support
+
+- **Regular Messages** - Standard user and assistant conversations
+- **Audio Messages** - Voice conversations embedded with HTML5 audio players
+- **Internal Reasoning** - ChatGPT's thinking process with special formatting
+- **Reasoning Summaries** - Brief reasoning recaps
+- **Tool Calls & Execution** - ChatGPT tool usage tracking
+- **Tool Results** - External tool response messages
+- **User Context** - Profile and instruction context
+- **Code Blocks** - Properly formatted code with syntax highlighting support
 
 ### Obsidian Optimization
-* **YAML Frontmatter** - Searchable metadata with title, creation date, update date, and tags
-* **Callout Syntax** - Beautiful callouts for special content types:
+
+- **YAML Frontmatter** - Searchable metadata with title, creation date, update date, and tags
+- **Callout Syntax** - Beautiful callouts for special content types:
   - `> [!note]` for internal reasoning
   - `> [!info]` for reasoning summaries
   - `> [!abstract]` for user context
-* **Embedded Images** - Relative paths for portability
-* **Cross-Platform Compatibility** - Works on Windows, macOS, and Linux
+- **Embedded Images** - Relative paths for portability
+- **Cross-Platform Compatibility** - Works on Windows, macOS, and Linux
 
 ### Customization Options
-* Customize user and assistant display names
-* Toggle Obsidian frontmatter and callouts
-* Include or exclude conversation dates
-* Custom date formatting
-* Custom filename templates
-* Configurable message separators
-* Skip empty messages option
+
+- Customize user and assistant display names
+- Toggle Obsidian frontmatter and callouts
+- Include or exclude conversation dates
+- Custom date formatting
+- Custom filename templates
+- Configurable message separators
+- Skip empty messages option
+- Optional `<details>` formatting mode: markdown (default) or HTML-safe verbatim code block for maximum renderer compatibility
 
 ---
 
@@ -72,19 +78,21 @@ That's it! No Python, no terminal, no dependencies. Everything runs locally in y
 
 ### Prerequisites
 
-* Python 3.7 or higher
-* ChatGPT data export (see instructions below)
+- Python 3.7 or higher
+- ChatGPT data export (see instructions below)
 
 ### Installation
 
 **One-Command Install:**
 
 **Windows:**
+
 ```batch
 curl -sL https://raw.githubusercontent.com/daugaard47/ChatGPT_Conversations_To_Markdown/main/install.bat -o install.bat && install.bat
 ```
 
 **Mac/Linux:**
+
 ```bash
 curl -sL https://raw.githubusercontent.com/daugaard47/ChatGPT_Conversations_To_Markdown/main/install.sh | bash
 ```
@@ -100,11 +108,13 @@ pip install -r requirements.txt
 ### Python Usage
 
 1. **Run setup wizard** (first time only):
+
 ```bash
 python setup.py
 ```
 
 2. **Convert conversations**:
+
 ```bash
 python chatgpt_json_to_markdown.py
 ```
@@ -122,6 +132,7 @@ python chatgpt_json_to_markdown.py
 ### What Happens During Conversion
 
 Both methods will:
+
 - ✅ Process all your conversations (could be 100s!)
 - ✅ Organize by your chosen mode (flat/category/date/hybrid)
 - ✅ Copy and organize all images → `Assets/Images/`
@@ -160,6 +171,7 @@ MarkdownFiles/
 **Other modes:** See the [Organization Guide](ORGANIZATION.md) for Flat, By Category, and By Date modes.
 
 **Media Embedding:**
+
 - Images: `![Image](../../Assets/Images/file-ABC123.png)`
 - Audio: `<audio controls src="../../Assets/Audio/file_0000.wav"></audio> *Audio (11.3s)*`
 
@@ -206,7 +218,7 @@ This diagram shows the React component lifecycle...
 
 **User**:
 
-<audio controls src="Assets/file_000000002be0.wav"></audio> *Audio (5.2s)*
+<audio controls src="Assets/file_000000002be0.wav"></audio> _Audio (5.2s)_
 
 **ChatGPT**:
 
@@ -216,15 +228,25 @@ Sure! I can hear your question about useState...
 ## 🔧 Troubleshooting
 
 ### Missing Images
+
 - Make sure you extracted **ALL files** from the ChatGPT export ZIP
 - Verify that `file-*` files and folders are in the `JsonFiles` directory
 - Check that paths in `config.json` are absolute paths (e.g., `C:\Users\...` on Windows)
 
+### New ChatGPT Export Format (Multiple conversation files)
+
+Recent ChatGPT exports may split conversations into multiple files (for example: `conversations-000.json`, `conversations-001.json`, etc.).
+
+- The browser-based converter supports both the legacy `conversations.json` format and the newer sharded format
+- If you are using the Python script, support for sharded exports may vary
+
 ### Path Errors on Windows
+
 - Use double backslashes in paths: `C:\\Users\\...`
 - Or use forward slashes: `C:/Users/...`
 
 ### Virtual Environment Issues
+
 ```bash
 # Deactivate and recreate if needed
 deactivate
@@ -248,6 +270,7 @@ Perfect integration with all features:
 6. ✅ **Done!** Find conversations in the sidebar
 
 **What you get:**
+
 - ✅ Searchable YAML frontmatter (title, dates, tags)
 - ✅ Collapsible thinking/reasoning sections
 - ✅ Embedded images and audio that work offline
@@ -308,6 +331,7 @@ Universal markdown compatibility:
 ## 📊 What Gets Converted?
 
 ✅ **Included:**
+
 - All conversation text
 - Images and screenshots you uploaded
 - DALL-E generated images
@@ -318,6 +342,7 @@ Universal markdown compatibility:
 - Code blocks with formatting
 
 ⚠️ **Special Handling:**
+
 - Video messages are shown as placeholders (audio track not currently extracted)
 - ChatGPT's web browsing results show content but not raw data
 
@@ -347,6 +372,7 @@ Universal markdown compatibility:
 This project is **free and open source**, available under the MIT License.
 
 You can:
+
 - ✅ Use it for personal projects
 - ✅ Use it for commercial projects
 - ✅ Modify and distribute it
@@ -357,6 +383,7 @@ You can:
 ## 📞 Support & Questions
 
 **Need help?**
+
 - 📖 Check the [Troubleshooting](#-troubleshooting) section above
 - 🐛 [Open an issue](https://github.com/daugaard47/ChatGPT_Conversations_To_Markdown/issues) on GitHub
 - 💬 Start a [Discussion](https://github.com/daugaard47/ChatGPT_Conversations_To_Markdown/discussions) for questions
@@ -372,6 +399,7 @@ You can:
 ## ⭐ Show Your Support
 
 If this tool helped you preserve your ChatGPT conversations:
+
 - ⭐ **Star this repo** on GitHub
 - 🐛 **Report bugs** to help improve it
 - 💡 **Share your ideas** for new features
@@ -382,4 +410,4 @@ If this tool helped you preserve your ChatGPT conversations:
 
 **Enjoy your beautifully formatted ChatGPT conversations!** 🎉
 
-*Free, open source, and built for the community.*
+_Free, open source, and built for the community._
