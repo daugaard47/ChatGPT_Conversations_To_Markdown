@@ -410,8 +410,16 @@ def process_conversations(data, output_dir, config, input_base_path):
                 author_name = _get_author_name(message, config)
 
                 if not config.get('skip_empty_messages', True) or content.strip():
+                    # Build timestamp string if enabled
+                    timestamp_str = ""
+                    if config.get('include_message_timestamps', True):
+                        msg_time = message.get("create_time")
+                        if msg_time:
+                            ts_format = config.get('message_timestamp_format', '%m-%d-%Y %H:%M')
+                            timestamp_str = f" <sub>{datetime.fromtimestamp(msg_time).strftime(ts_format)}</sub>"
+
                     # Write author and content
-                    f.write(f"**{author_name}**:\n\n{content}{config['message_separator']}")
+                    f.write(f"**{author_name}**:{timestamp_str}\n\n{content}{config['message_separator']}")
 
 def main():
     config_path = Path("config.json")

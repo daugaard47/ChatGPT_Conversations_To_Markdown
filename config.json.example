@@ -7,6 +7,8 @@
   "date_format": "%m-%d-%Y",
   "file_name_format": "{title}",
   "include_date": true,
+  "include_message_timestamps": true,
+  "message_timestamp_format": "%m-%d-%Y %H:%M",
   "message_separator": "\n\n",
   "skip_empty_messages": true,
   "use_frontmatter": true,

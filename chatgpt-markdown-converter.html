@@ -182,6 +182,7 @@
                       ></path>
                     </svg>
                     <span x-text="zipFile?.name"></span>
+                    <span x-show="zipFile" class="text-gray-400 ml-2" x-text="zipFile ? `(${(zipFile.size / (1024*1024)).toFixed(1)} MB)` : ''"></span>
                   </span>
                 </p>
                 <p class="text-sm text-gray-500">ChatGPT export ZIP file</p>
@@ -377,7 +378,18 @@
                 />
                 <div>
                   <span class="font-medium text-gray-900">Include Dates</span>
-                  <p class="text-sm text-gray-500">Show timestamps</p>
+                  <p class="text-sm text-gray-500">Show conversation date</p>
+                </div>
+              </label>
+              <label class="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  x-model="config.include_message_timestamps"
+                  class="w-5 h-5 text-indigo-600 rounded"
+                />
+                <div>
+                  <span class="font-medium text-gray-900">Per-Message Timestamps</span>
+                  <p class="text-sm text-gray-500">Show date and time on each message</p>
                 </div>
               </label>
             </div>
@@ -756,6 +768,7 @@
             use_collapsible_thinking: true,
             details_content_format: "markdown", // "markdown" | "html"
             include_date: true,
+            include_message_timestamps: true,
             starred_folder: "Starred",
             archived_folder: "Archived",
             regular_folder: "Regular",
@@ -776,8 +789,26 @@
           outputZip: null,
 
           async handleFileUpload(event) {
-            this.zipFile = event.target.files[0];
-            if (this.zipFile) console.log("ZIP loaded:", this.zipFile.name);
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (file.size > 2 * 1024 * 1024 * 1024) {
+              alert(
+                `This ZIP file is ${(file.size / (1024 * 1024 * 1024)).toFixed(1)} GB, ` +
+                `which exceeds the 2 GB browser limit.\n\n` +
+                `The web converter cannot process files this large due to browser memory constraints.\n\n` +
+                `Alternatives:\n` +
+                `1. Use the Python CLI tool (chatgpt_json_to_markdown.py) for large exports\n` +
+                `2. Extract the ZIP manually and point the Python tool at the directory\n` +
+                `3. Split your export into smaller ZIPs (each under 2 GB)`
+              );
+              event.target.value = "";
+              this.zipFile = null;
+              return;
+            }
+
+            this.zipFile = file;
+            console.log("ZIP loaded:", this.zipFile.name, `(${(file.size / (1024 * 1024)).toFixed(1)} MB)`);
           },
 
           // ON-DEMAND SEARCH: Find file starting with fileId (Python glob-style)
@@ -1027,6 +1058,11 @@
               } else if (error.message.includes("JSON")) {
                 errorMessage =
                   "Invalid JSON format in conversations.json. The file may be corrupted.";
+              } else if (error.message.includes("Corrupted zip") || error.message.includes("End of data reached")) {
+                errorMessage =
+                  "This ZIP file appears too large for browser-based processing. " +
+                  "Please use the Python CLI tool (chatgpt_json_to_markdown.py) for large exports, " +
+                  "or extract the ZIP manually and use directory mode.";
               } else {
                 errorMessage = `Error: ${error.message}`;
               }
@@ -1111,7 +1147,13 @@
                 dalleFolder,
                 conversationPath,
               );
-              if (content.trim()) md += `**${author}**:\n\n${content}\n\n`;
+              if (content.trim()) {
+                let tsStr = "";
+                if (this.config.include_message_timestamps && msg.create_time) {
+                  tsStr = ` <sub>${this.formatTimestamp(msg.create_time)}</sub>`;
+                }
+                md += `**${author}**:${tsStr}\n\n${content}\n\n`;
+              }
             }
 
             return md;
