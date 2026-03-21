@@ -225,8 +225,8 @@
                 </p>
                 <div class="mt-3 text-xs text-gray-400 font-mono">
                   📁 MarkdownFiles/<br />
-                  ├─ Conv1.md<br />
-                  ├─ Conv2.md<br />
+                  ├─ Conv1_ab12cd34.md<br />
+                  ├─ Conv2_f0e1d2c3.md<br />
                   └─ Assets/
                 </div>
               </div>
@@ -915,6 +915,38 @@
               .replaceAll(">", "&gt;");
           },
 
+          // NEW: Keep Unicode letters/numbers, only strip filesystem-dangerous characters.
+          sanitizePathSegment(value) {
+            return String(value ?? "")
+              .normalize("NFKC")
+              .replace(/[\\/:*?"<>|]/g, "_")
+              .replace(/\s+/g, " ")
+              .trim();
+          },
+
+          getConversationId(conv) {
+            return String(
+              conv.conversation_id ||
+                conv.conversationId ||
+                conv.id ||
+                conv.uuid ||
+                "",
+            )
+              .trim()
+              .slice(0, 8);
+          },
+
+          getConversationSlug(conv) {
+            const rawTitle = conv.title || "Untitled";
+            const safeTitle = this.sanitizePathSegment(rawTitle).replace(
+              /\s+/g,
+              "_",
+            );
+            const stem = safeTitle || "conversation";
+            const suffix = this.getConversationId(conv);
+            return suffix ? `${stem}_${suffix}` : stem;
+          },
+
           // NEW: Render <details> body according to config.details_content_format
           renderDetailsBody(bodyText) {
             if (this.config.details_content_format !== "html") {
@@ -1578,17 +1610,14 @@
           },
 
           getConversationPath(conv) {
-            const title =
-              (conv.title || "Untitled")
-                .replace(/[^a-z0-9_\- ]/gi, "")
-                .trim() || "conversation";
-            const filename = `${title.replace(/\s+/g, "_")}.md`;
+            const stem = this.getConversationSlug(conv);
+            const filename = `${stem}.md`;
             const mode = this.config.organization_mode;
             const base = "MarkdownFiles/";
             let category = null;
             if (conv.is_starred) category = this.config.starred_folder;
             else if (conv.is_archived) category = this.config.archived_folder;
-            if (mode === "flat") return base + filename;
+            if (mode === "flat") return `${base}${filename}`;
             if (mode === "category")
               return category
                 ? `${base}${category}/${filename}`
@@ -1601,7 +1630,7 @@
                 ? `${base}${category}/${date}/${filename}`
                 : `${base}${this.config.regular_folder}/${date}/${filename}`;
             }
-            return base + filename;
+            return `${base}${filename}`;
           },
 
           // Calculate correct relative path from markdown file to asset folder
