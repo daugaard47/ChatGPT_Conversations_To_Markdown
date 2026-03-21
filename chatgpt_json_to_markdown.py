@@ -5,7 +5,11 @@ import glob
 import shutil
 import re
 from datetime import datetime
-from tqdm import tqdm
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iterable, **kwargs):
+        return iterable
 from pathlib import Path
 from organize import get_conversation_path, get_asset_path, get_relative_asset_path
 
@@ -13,6 +17,25 @@ def read_json_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
         data = json.load(file)
     return data
+
+def normalize_timestamp(value):
+    """
+    Normalize timestamps that may arrive either in seconds or milliseconds.
+    Returns a float timestamp in seconds, or None if the value cannot be used.
+    """
+    if value is None:
+        return None
+
+    try:
+        ts = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    # Some ChatGPT export payloads store timestamps in milliseconds.
+    if ts > 1e12:
+        ts /= 1000.0
+
+    return ts
 
 def extract_file_id(asset_pointer):
     """
@@ -309,12 +332,14 @@ def generate_frontmatter(title, create_time, update_time, config):
     lines = ["---"]
     lines.append(f"title: \"{title}\"")
 
-    if create_time:
-        created = datetime.fromtimestamp(create_time).strftime("%Y-%m-%d %H:%M:%S")
+    created_ts = normalize_timestamp(create_time)
+    if created_ts:
+        created = datetime.fromtimestamp(created_ts).strftime("%Y-%m-%d %H:%M:%S")
         lines.append(f"created: {created}")
 
-    if update_time:
-        updated = datetime.fromtimestamp(update_time).strftime("%Y-%m-%d %H:%M:%S")
+    updated_ts = normalize_timestamp(update_time)
+    if updated_ts:
+        updated = datetime.fromtimestamp(updated_ts).strftime("%Y-%m-%d %H:%M:%S")
         lines.append(f"updated: {updated}")
 
     lines.append("tags:")
@@ -373,7 +398,14 @@ def process_conversations(data, output_dir, config, input_base_path):
         conversation_dir.mkdir(parents=True, exist_ok=True)
 
         # Create filename
-        file_name = f"{config['file_name_format'].format(title=sanitized_title.replace(' ', '_').replace('/', '_'))}.md"
+        # Add a short conversation id suffix so duplicate titles never overwrite each other.
+        conversation_id = entry.get("conversation_id", "")
+        file_stem = config["file_name_format"].format(
+            title=sanitized_title.replace(' ', '_').replace('/', '_')
+        )
+        if conversation_id:
+            file_stem = f"{file_stem}_{conversation_id[:8]}"
+        file_name = f"{file_stem}.md"
         file_path = conversation_dir / file_name
 
         # Write messages to file
@@ -387,8 +419,9 @@ def process_conversations(data, output_dir, config, input_base_path):
             f.write(f"# {inferred_title}\n\n")
 
             # Write date if configured
-            if messages and messages[0].get("create_time") and config.get('include_date', True):
-                date = datetime.fromtimestamp(messages[0]["create_time"]).strftime(config['date_format'])
+            first_message_ts = normalize_timestamp(messages[0].get("create_time")) if messages else None
+            if first_message_ts and config.get('include_date', True):
+                date = datetime.fromtimestamp(first_message_ts).strftime(config['date_format'])
                 f.write(f"<sub>{date}</sub>\n\n")
 
             # Write separator
@@ -413,7 +446,7 @@ def process_conversations(data, output_dir, config, input_base_path):
                     # Build timestamp string if enabled
                     timestamp_str = ""
                     if config.get('include_message_timestamps', True):
-                        msg_time = message.get("create_time")
+                        msg_time = normalize_timestamp(message.get("create_time"))
                         if msg_time:
                             ts_format = config.get('message_timestamp_format', '%m-%d-%Y %H:%M')
                             timestamp_str = f" <sub>{datetime.fromtimestamp(msg_time).strftime(ts_format)}</sub>"
