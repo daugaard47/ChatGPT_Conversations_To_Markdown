@@ -39,24 +39,36 @@ def extract_chatgpt_zip(zip_path, extract_to=None):
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(extract_to)
 
-    # Find conversations.json
+    # Find conversations data — supports both legacy (conversations.json) and
+    # sharded exports (conversations-000.json, conversations-001.json, …)
     conversations_file = extract_to / "conversations.json"
 
     if not conversations_file.exists():
-        # Maybe it's in a subdirectory
+        # Maybe it's in a subdirectory (legacy layout)
         for json_file in extract_to.rglob("conversations.json"):
             conversations_file = json_file
             extract_to = json_file.parent
             break
 
     if not conversations_file.exists():
-        raise FileNotFoundError(
-            f"conversations.json not found in ZIP. "
-            f"Make sure you exported the correct ChatGPT data."
-        )
+        # Check for sharded format (conversations-NNN.json / export_manifest.json)
+        shards = list(extract_to.glob("conversations-*.json"))
+        if not shards:
+            # Try recursively
+            for shard in extract_to.rglob("conversations-*.json"):
+                extract_to = shard.parent
+                shards = list(extract_to.glob("conversations-*.json"))
+                break
+
+        if not shards:
+            raise FileNotFoundError(
+                f"No conversations data found in ZIP. "
+                f"Expected conversations.json or conversations-NNN.json files. "
+                f"Make sure you exported the correct ChatGPT data."
+            )
 
     print(f"✅ Extracted successfully!")
-    print(f"   Found conversations.json at: {extract_to}")
+    print(f"   Found conversations data at: {extract_to}")
 
     return extract_to
 
@@ -73,9 +85,16 @@ def is_zip_file(path):
     return path.exists() and zipfile.is_zipfile(path)
 
 def is_extracted_directory(path):
-    """Check if path is an already-extracted ChatGPT export directory"""
+    """Check if path is an already-extracted ChatGPT export directory.
+    Accepts both legacy (conversations.json) and sharded (conversations-NNN.json) layouts."""
     path = Path(path)
-    return path.exists() and (path / "conversations.json").exists()
+    if not path.exists():
+        return False
+    return (
+        (path / "conversations.json").exists()
+        or bool(list(path.glob("conversations-*.json")))
+        or (path / "export_manifest.json").exists()
+    )
 
 if __name__ == "__main__":
     import sys
