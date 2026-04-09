@@ -1,7 +1,15 @@
+import re
 import zipfile
 import os
 import shutil
 from pathlib import Path
+
+def _find_shards(directory):
+    """Return a sorted list of sharded conversation files (conversations-NNN.json) in directory."""
+    return sorted(
+        f for f in directory.iterdir()
+        if re.match(r'conversations-\d+\.json$', f.name)
+    )
 
 def extract_chatgpt_zip(zip_path, extract_to=None):
     """
@@ -12,7 +20,7 @@ def extract_chatgpt_zip(zip_path, extract_to=None):
         extract_to: Where to extract (defaults to temp folder)
 
     Returns:
-        Path to extracted conversations.json directory
+        Path to the directory containing conversations data
     """
     zip_path = Path(zip_path)
 
@@ -39,26 +47,39 @@ def extract_chatgpt_zip(zip_path, extract_to=None):
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(extract_to)
 
-    # Find conversations.json
+    # Locate conversations data — supports both legacy (conversations.json) and
+    # sharded exports (conversations-NNN.json).  Always returns the directory, never a file.
     conversations_file = extract_to / "conversations.json"
 
     if not conversations_file.exists():
-        # Maybe it's in a subdirectory
+        # Maybe it's in a subdirectory (legacy layout)
         for json_file in extract_to.rglob("conversations.json"):
             conversations_file = json_file
             extract_to = json_file.parent
             break
 
     if not conversations_file.exists():
-        raise FileNotFoundError(
-            f"conversations.json not found in ZIP. "
-            f"Make sure you exported the correct ChatGPT data."
-        )
+        # Check for sharded format using digits-only pattern
+        shards = _find_shards(extract_to)
+        if not shards:
+            # Try recursively (shards may be inside a subdirectory)
+            for shard in extract_to.rglob("conversations-*.json"):
+                if re.match(r'conversations-\d+\.json$', shard.name):
+                    extract_to = shard.parent
+                    shards = _find_shards(extract_to)
+                    break
+
+        if not shards:
+            raise FileNotFoundError(
+                f"No conversations data found in ZIP. "
+                f"Expected conversations.json or conversations-NNN.json files. "
+                f"Make sure you exported the correct ChatGPT data."
+            )
 
     print(f"✅ Extracted successfully!")
-    print(f"   Found conversations.json at: {extract_to}")
+    print(f"   Found conversations data at: {extract_to}")
 
-    return extract_to
+    return extract_to  # Always a directory, never a file path
 
 def cleanup_extracted_files(extract_path):
     """Remove extracted files (optional cleanup)"""
@@ -73,9 +94,15 @@ def is_zip_file(path):
     return path.exists() and zipfile.is_zipfile(path)
 
 def is_extracted_directory(path):
-    """Check if path is an already-extracted ChatGPT export directory"""
+    """Check if path is an already-extracted ChatGPT export directory.
+    Accepts both legacy (conversations.json) and sharded (conversations-NNN.json) layouts.
+    Does not rely on export_manifest.json alone — requires actual conversation files."""
     path = Path(path)
-    return path.exists() and (path / "conversations.json").exists()
+    if not path.exists():
+        return False
+    if (path / "conversations.json").exists():
+        return True
+    return bool(_find_shards(path))
 
 if __name__ == "__main__":
     import sys

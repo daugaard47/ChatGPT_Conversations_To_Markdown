@@ -112,7 +112,7 @@ def get_input_path():
 
         else:
             print(f"   ❌ Invalid path. Could not find:")
-            print(f"      - conversations.json in folder, or")
+            print(f"      - conversations.json or conversations-NNN.json in folder, or")
             print(f"      - valid ZIP file")
             print(f"   Please try again.")
 
