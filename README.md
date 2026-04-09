@@ -124,6 +124,29 @@ python chatgpt_json_to_markdown.py
 
 3. **Done!** Open your `MarkdownFiles` folder
 
+### Filename Templates
+
+The `file_name_format` key in `config.json` controls how output filenames are constructed. The following tokens are supported:
+
+| Token | Description | Example |
+|---|---|---|
+| `{title}` | Conversation title — alphanumeric only, spaces replaced with underscores | `My_Conversation` |
+| `{display_title}` | Conversation title — alphanumeric only, spaces preserved | `My Conversation` |
+| `{id}` | First 8 characters of the conversation ID (collision safety) | `abc12345` |
+| `{date}` | Conversation creation date, formatted with `date_format` | `2024-03-15` |
+
+**Default:** `{title}_{id}` → `My_Conversation_abc12345.md`
+
+**Examples:**
+
+```json
+"file_name_format": "{title}_{id}"
+"file_name_format": "{date}_{title}_{id}"
+"file_name_format": "{date} - {display_title} ({id})"
+```
+
+> **Note:** Including `{id}` in your format is recommended. It ensures conversations with identical titles never overwrite each other.
+
 ## 📥 Getting Your ChatGPT Data
 
 1. Go to [ChatGPT Settings](https://chatgpt.com/settings) → **Data Controls**
@@ -240,8 +263,7 @@ Sure! I can hear your question about useState...
 
 Recent ChatGPT exports may split conversations into multiple files (for example: `conversations-000.json`, `conversations-001.json`, etc.).
 
-- The browser-based converter supports both the legacy `conversations.json` format and the newer sharded format
-- If you are using the Python script, support for sharded exports may vary
+Both the browser-based converter and the Python script support the legacy `conversations.json` format and the newer sharded format. The setup wizard and converter will detect whichever layout is present automatically.
 
 ### Path Errors on Windows
 
