@@ -175,8 +175,9 @@ def run_setup():
     config['use_obsidian_callouts'] = obsidian in ['Y', 'YES']
 
     # 6. Other settings (with defaults)
+    config['version'] = 2
     config['date_format'] = '%m-%d-%Y'
-    config['file_name_format'] = '{title}'
+    config['file_name_format'] = '{title}_{id}'
     config['include_date'] = True
     config['include_message_timestamps'] = True
     config['message_timestamp_format'] = '%m-%d-%Y %H:%M'

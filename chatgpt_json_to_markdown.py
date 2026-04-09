@@ -388,23 +388,39 @@ def process_conversations(data, output_dir, config, input_base_path):
         # Use the first message to infer the title if it's not available
         inferred_title = _get_title(title, messages[0] if messages else None)
 
-        # Sanitize the title to ensure it's a valid filename
-        sanitized_title = ''.join(c for c in inferred_title if c.isalnum() or c in [' ', '_', '-']).rstrip()
-        if not sanitized_title:
-            sanitized_title = f"conversation_{int(create_time or 0)}"
-
         # Get organized path for this conversation
         conversation_dir = get_conversation_path(entry, config, output_base)
         conversation_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create filename
-        # Add a short conversation id suffix so duplicate titles never overwrite each other.
+        # Build filename token values
         conversation_id = entry.get("conversation_id", "")
+
+        # Shared whitelist filter — keeps alphanumeric, spaces, underscores, hyphens
+        _filtered = ''.join(c for c in inferred_title if c.isalnum() or c in [' ', '_', '-']).strip()
+        if not _filtered:
+            _filtered = f"conversation_{int(create_time or 0)}"
+
+        # {title}: spaces replaced with underscores — matches upstream behavior exactly
+        safe_title = _filtered.replace(' ', '_')
+
+        # {display_title}: spaces preserved
+        display_title = _filtered
+
+        # {id}: short conversation ID for collision safety
+        id_short = conversation_id[:8] if conversation_id else ""
+
+        # {date}: conversation creation date
+        date_str = ""
+        create_ts = normalize_timestamp(create_time)
+        if create_ts:
+            date_str = datetime.fromtimestamp(create_ts).strftime(config.get('date_format', '%m-%d-%Y'))
+
         file_stem = config["file_name_format"].format(
-            title=sanitized_title.replace(' ', '_').replace('/', '_')
+            title=safe_title,
+            display_title=display_title,
+            id=id_short,
+            date=date_str,
         )
-        if conversation_id:
-            file_stem = f"{file_stem}_{conversation_id[:8]}"
         file_name = f"{file_stem}.md"
         file_path = conversation_dir / file_name
 
@@ -454,6 +470,29 @@ def process_conversations(data, output_dir, config, input_base_path):
                     # Write author and content
                     f.write(f"**{author_name}**:{timestamp_str}\n\n{content}{config['message_separator']}")
 
+def migrate_config(config, config_path):
+    """Migrate config.json to the latest version, saving changes back to disk."""
+    version = config.get('version', 1)
+    if version >= 2:
+        return config
+
+    # v1 → v2: make {id} an explicit token in file_name_format so users can control placement.
+    # Replace bare {title} with {title}_{id} to preserve the existing filename output exactly.
+    # Guard against {id} already being present to avoid double-appending.
+    fmt = config.get('file_name_format', '{title}')
+    if '{id}' not in fmt:
+        new_fmt = fmt.replace('{title}', '{title}_{id}')
+    else:
+        new_fmt = fmt
+    config['file_name_format'] = new_fmt
+    config['version'] = 2
+
+    with open(config_path, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2)
+
+    print(f"  ℹ️  config.json migrated to v2 — file_name_format: '{fmt}' → '{new_fmt}'")
+    return config
+
 def main():
     config_path = Path("config.json")
 
@@ -463,6 +502,15 @@ def main():
         sys.exit(1)
 
     config = read_json_file(config_path)
+    config = migrate_config(config, config_path)
+
+    # Validate file_name_format tokens before processing begins
+    try:
+        config["file_name_format"].format(title="", display_title="", id="", date="")
+    except KeyError as e:
+        print(f"❌ Unknown token {e} in file_name_format: \"{config['file_name_format']}\"")
+        print(f"   Valid tokens: {{title}}, {{display_title}}, {{id}}, {{date}}")
+        sys.exit(1)
 
     input_path = Path(config['input_path'])
     output_dir = Path(config['output_directory'])
