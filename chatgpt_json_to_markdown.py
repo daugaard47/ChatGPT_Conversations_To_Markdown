@@ -217,6 +217,14 @@ def _process_message_parts(parts, input_base_path, output_base, config, conversa
     content = content.replace('\r\n', '\n').replace('\r', '\n')
     return content, attachments
 
+def _callout_collapse_marker(state):
+    """Return the Obsidian callout collapse suffix for a given state string."""
+    if state == 'collapsed':
+        return '-'
+    elif state == 'expanded':
+        return '+'
+    return ''
+
 def _get_message_content(message, input_base_path, output_base, config, conversation_path):
     """
     Extracts the content of a message from the message object,
@@ -234,7 +242,12 @@ def _get_message_content(message, input_base_path, output_base, config, conversa
         # Handle reasoning recap messages
         recap_text = content_obj.get('content', 'Reasoning completed')
         if config.get('use_obsidian_callouts', True):
-            content = f"> [!info] Reasoning Summary\n> {recap_text}"
+            callout_type = config.get('reasoning_summary_callout_type', 'info')
+            if callout_type:
+                collapse = _callout_collapse_marker(config.get('reasoning_summary_callout_state', 'static'))
+                content = f"> [!{callout_type}]{collapse} Reasoning Summary\n> {recap_text}"
+            else:
+                content = recap_text
         else:
             content = f"*{recap_text}*"
         return content, []
@@ -251,7 +264,10 @@ def _get_message_content(message, input_base_path, output_base, config, conversa
 
         content = "\n".join(thought_lines)
         if config.get('use_obsidian_callouts', True) and content:
-            content = f"> [!note] Internal Reasoning\n> " + content.replace("\n", "\n> ")
+            callout_type = config.get('reasoning_callout_type', 'note')
+            if callout_type:
+                collapse = _callout_collapse_marker(config.get('reasoning_callout_state', 'static'))
+                content = f"> [!{callout_type}]{collapse} Internal Reasoning\n> " + content.replace("\n", "\n> ")
         return content, []
 
     elif content_type == "user_editable_context":
@@ -287,7 +303,7 @@ def _get_author_name(message, config):
     Determines the appropriate author name based on message type and role.
     """
     author_role = message.get("author", {}).get("role", "unknown")
-    base_name = config['user_name'] if author_role == "user" else config['assistant_name']
+    base_name = config.get('user_name', '') if author_role == "user" else config.get('assistant_name', 'ChatGPT')
 
     # Handle tool messages
     if author_role == "tool":
@@ -308,9 +324,9 @@ def _get_author_name(message, config):
 
     # Other special content types
     if "thoughts" in content:
-        return f"{base_name} (thinking)"
+        return "Internal Reasoning"
     elif content_type == "reasoning_recap":
-        return f"{base_name} (reasoning summary)"
+        return "Reasoning Summary"
     elif content_type == "user_editable_context":
         return "System (context)"
 
@@ -553,7 +569,8 @@ def process_conversations(data, output_dir, config, input_base_path):
             # Write messages
             for message in messages:
                 # Skip system messages
-                if message.get("author", {}).get("role") == "system":
+                author_role = message.get("author", {}).get("role", "unknown")
+                if author_role == "system":
                     continue
 
                 content, attachments = _get_message_content(
@@ -565,6 +582,28 @@ def process_conversations(data, output_dir, config, input_base_path):
                 )
                 author_name = _get_author_name(message, config)
 
+                # Detect reasoning/recap messages — they carry their own callout
+                # headers and must not be wrapped by response_callout_type.
+                msg_content = message.get("content", {})
+                msg_content_type = msg_content.get("content_type", "")
+                is_reasoning = "thoughts" in msg_content
+                is_recap = msg_content_type == "reasoning_recap"
+
+                # Suppress the bold header for reasoning/recap when their own
+                # callout is active — the callout title serves as the header.
+                if is_reasoning:
+                    suppress_header = bool(
+                        config.get('use_obsidian_callouts', True) and
+                        config.get('reasoning_callout_type', 'note')
+                    )
+                elif is_recap:
+                    suppress_header = bool(
+                        config.get('use_obsidian_callouts', True) and
+                        config.get('reasoning_summary_callout_type', 'info')
+                    )
+                else:
+                    suppress_header = False
+
                 if not config.get('skip_empty_messages', True) or content.strip():
                     # Build timestamp string if enabled
                     timestamp_str = ""
@@ -572,10 +611,68 @@ def process_conversations(data, output_dir, config, input_base_path):
                         msg_time = normalize_timestamp(message.get("create_time"))
                         if msg_time:
                             ts_format = config.get('message_timestamp_format', '%m-%d-%Y %H:%M')
-                            timestamp_str = f" <sub>{datetime.fromtimestamp(msg_time).strftime(ts_format)}</sub>"
+                            ts_text = datetime.fromtimestamp(msg_time).strftime(ts_format)
+                            tag = config.get('timestamp_tag', 'sub')
+                            timestamp_str = f"<{tag}>{ts_text}</{tag}>" if tag else ts_text
 
-                    # Write author and content
-                    f.write(f"**{author_name}**:{timestamp_str}\n\n{content}{config['message_separator']}")
+                    timestamp_position = config.get('timestamp_position', 'header')
+
+                    # Determine prompt/response/tool callout type and collapse state.
+                    # Reasoning/recap messages are excluded — they manage their own callouts.
+                    if author_role == "user":
+                        msg_callout_type = config.get('prompt_callout_type', '')
+                        msg_callout_state = 'static'
+                    elif author_role == "tool":
+                        msg_callout_type = config.get('tool_callout_type', '')
+                        msg_callout_state = config.get('tool_callout_state', 'static')
+                    elif author_role == "assistant" and not (is_reasoning or is_recap):
+                        msg_callout_type = config.get('response_callout_type', '')
+                        msg_callout_state = 'static'
+                    else:
+                        msg_callout_type = ''
+                        msg_callout_state = 'static'
+
+                    if msg_callout_type:
+                        # Prompt/response/tool callout mode: author name is the callout title.
+                        collapse = _callout_collapse_marker(msg_callout_state)
+                        title_part = f" {author_name}" if author_name else ""
+                        callout_header = f"> [!{msg_callout_type}]{collapse}{title_part}"
+                        callout_body = "> " + content.replace("\n", "\n> ")
+                        if timestamp_str and timestamp_position == 'header':
+                            block = f"{callout_header}\n> {timestamp_str}\n> \n{callout_body}"
+                        else:
+                            block = f"{callout_header}\n{callout_body}"
+                        if timestamp_str and timestamp_position == 'footer':
+                            block += f"\n> \n> {timestamp_str}"
+
+                    elif suppress_header and timestamp_str:
+                        # Reasoning/recap with an active callout and a timestamp:
+                        # inject timestamp into the callout so it stays attached.
+                        # content is guaranteed to be a callout block here.
+                        first_nl = content.find('\n')
+                        if first_nl != -1:
+                            cl1 = content[:first_nl]
+                            rest = content[first_nl:]  # starts with \n
+                            if timestamp_position == 'header':
+                                block = f"{cl1}\n> {timestamp_str}\n> {rest}"
+                            else:  # footer
+                                block = f"{content}\n> \n> {timestamp_str}"
+                        else:
+                            block = content
+
+                    else:
+                        # Standard mode: timestamp always on its own line after the
+                        # header so it remains visible even when the header is hidden.
+                        header_parts = []
+                        if author_name and not suppress_header:
+                            header_parts.append(f"**{author_name}**:")
+                        if timestamp_str and timestamp_position == 'header':
+                            header_parts.append(timestamp_str)
+                        header = "\n".join(header_parts) + "\n\n" if header_parts else ""
+                        footer = f"\n\n{timestamp_str}" if timestamp_str and timestamp_position == 'footer' else ""
+                        block = f"{header}{content}{footer}"
+
+                    f.write(f"{block}{config['message_separator']}")
 
 def migrate_config(config, config_path):
     """Migrate config.json to the latest version, saving changes back to disk."""

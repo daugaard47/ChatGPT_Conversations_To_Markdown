@@ -20,5 +20,15 @@
   "message_timestamp_format": "%m-%d-%Y %H:%M",
   "message_separator": "\n\n",
   "skip_empty_messages": true,
-  "line_endings": "native"
+  "line_endings": "native",
+  "reasoning_callout_type": "note",
+  "reasoning_callout_state": "static",
+  "reasoning_summary_callout_type": "info",
+  "reasoning_summary_callout_state": "static",
+  "prompt_callout_type": "",
+  "response_callout_type": "",
+  "tool_callout_type": "",
+  "tool_callout_state": "static",
+  "timestamp_tag": "sub",
+  "timestamp_position": "header"
 }
