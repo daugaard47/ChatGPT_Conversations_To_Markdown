@@ -661,14 +661,19 @@ def process_conversations(data, output_dir, config, input_base_path):
                             block = content
 
                     else:
-                        # Standard mode: timestamp always on its own line after the
-                        # header so it remains visible even when the header is hidden.
-                        header_parts = []
+                        # Standard mode: timestamp inline with the bold header, matching
+                        # original output. When the header is suppressed (empty author
+                        # name), the timestamp is written on its own line so it remains
+                        # visible.
                         if author_name and not suppress_header:
-                            header_parts.append(f"**{author_name}**:")
-                        if timestamp_str and timestamp_position == 'header':
-                            header_parts.append(timestamp_str)
-                        header = "\n".join(header_parts) + "\n\n" if header_parts else ""
+                            if timestamp_str and timestamp_position == 'header':
+                                header = f"**{author_name}**: {timestamp_str}\n\n"
+                            else:
+                                header = f"**{author_name}**:\n\n"
+                        elif timestamp_str and timestamp_position == 'header':
+                            header = f"{timestamp_str}\n\n"
+                        else:
+                            header = ""
                         footer = f"\n\n{timestamp_str}" if timestamp_str and timestamp_position == 'footer' else ""
                         block = f"{header}{content}{footer}"
 
