@@ -19,5 +19,6 @@
   "include_message_timestamps": true,
   "message_timestamp_format": "%m-%d-%Y %H:%M",
   "message_separator": "\n\n",
-  "skip_empty_messages": true
+  "skip_empty_messages": true,
+  "line_endings": "native"
 }
