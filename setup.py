@@ -183,6 +183,7 @@ def run_setup():
     config['message_timestamp_format'] = '%m-%d-%Y %H:%M'
     config['message_separator'] = '\n\n'
     config['skip_empty_messages'] = True
+    config['line_endings'] = 'native'
 
     # Save config
     config_path = Path('config.json')

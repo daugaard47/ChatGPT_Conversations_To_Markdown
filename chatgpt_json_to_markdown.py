@@ -213,6 +213,8 @@ def _process_message_parts(parts, input_base_path, output_base, config, conversa
     content = "\n".join(filter(None, content_pieces))
     # Strip Unicode Private Use Area characters used as metadata delimiters (fixes #8)
     content = re.sub(r'[\ue000-\uf8ff]', '', content)
+    # Normalize line endings — pasted content may carry \r\n or bare \r from external sources
+    content = content.replace('\r\n', '\n').replace('\r', '\n')
     return content, attachments
 
 def _get_message_content(message, input_base_path, output_base, config, conversation_path):
@@ -267,10 +269,12 @@ def _get_message_content(message, input_base_path, output_base, config, conversa
         return f"```\n{code_text}\n```", []
 
     elif "text" in content_obj:
-        return re.sub(r'[\ue000-\uf8ff]', '', content_obj["text"]), []
+        text = re.sub(r'[\ue000-\uf8ff]', '', content_obj["text"])
+        return text.replace('\r\n', '\n').replace('\r', '\n'), []
 
     elif "result" in content_obj:
-        return re.sub(r'[\ue000-\uf8ff]', '', content_obj["result"]), []
+        text = re.sub(r'[\ue000-\uf8ff]', '', content_obj["result"])
+        return text.replace('\r\n', '\n').replace('\r', '\n'), []
 
     else:
         # Unknown format, try to extract something useful
@@ -527,7 +531,8 @@ def process_conversations(data, output_dir, config, input_base_path):
         file_path = conversation_dir / file_name
 
         # Write messages to file
-        with open(file_path, "w", encoding="utf-8") as f:
+        newline = {'lf': '\n', 'crlf': '\r\n'}.get(config.get('line_endings', 'native'))
+        with open(file_path, "w", encoding="utf-8", newline=newline) as f:
             # Write frontmatter
             if config.get('use_frontmatter', True):
                 frontmatter = generate_frontmatter(inferred_title, create_time, update_time, config)

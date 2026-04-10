@@ -147,6 +147,22 @@ The `file_name_format` key in `config.json` controls how output filenames are co
 
 > **Note:** Including `{id}` in your format is recommended. It ensures conversations with identical titles never overwrite each other.
 
+### Line Endings
+
+The `line_endings` key controls the line ending style written to `.md` files:
+
+| Value | Line Ending | Use When |
+|-------|-------------|----------|
+| `native` | OS default (`\r\n` on Windows, `\n` on macOS/Linux) | Default — matches your OS |
+| `lf` | `\n` (Unix) | Cross-platform vaults, Git repos, macOS/Linux Obsidian |
+| `crlf` | `\r\n` (Windows) | Windows-only vaults where tools expect CRLF |
+
+```json
+"line_endings": "lf"
+```
+
+> **Note:** `lf` is recommended for Obsidian vaults that are synced or version-controlled, as it avoids platform-specific diffs.
+
 ## 📥 Getting Your ChatGPT Data
 
 1. Go to [ChatGPT Settings](https://chatgpt.com/settings) → **Data Controls**
