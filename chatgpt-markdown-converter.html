@@ -1104,6 +1104,103 @@
             }
           },
 
+          traverseMapping(mapping, nCandidates = 5) {
+            // Traverse the conversation's linked-list structure to extract messages
+            // in correct order. Sorting by create_time is unreliable — ChatGPT assigns
+            // timestamps by server-side processing order, which can differ from
+            // conversation order. See _traverse_mapping() in chatgpt_json_to_markdown.py
+            // for the full rationale. Ported 1:1 from the Python implementation.
+            if (!mapping) return [];
+
+            const nodeIds = new Set(Object.keys(mapping));
+
+            // Step 1 — find all leaf nodes
+            const leaves = Object.values(mapping).filter(
+              (node) =>
+                node &&
+                typeof node === "object" &&
+                (!node.children || node.children.length === 0),
+            );
+            if (leaves.length === 0) return [];
+
+            const leafTime = (node) => {
+              const msg = node.message || {};
+              return msg.update_time || msg.create_time || 0;
+            };
+
+            // Step 2 — sort by update_time DESC (fallback: create_time), take top N
+            leaves.sort((a, b) => leafTime(b) - leafTime(a));
+            const candidates = leaves.slice(0, nCandidates);
+
+            // Step 3 — compute backward chain length for each candidate
+            const chainLength = (startNode) => {
+              let length = 0;
+              let currentId = startNode.id;
+              const visited = new Set();
+              while (currentId && mapping[currentId] && !visited.has(currentId)) {
+                visited.add(currentId);
+                length += 1;
+                currentId = mapping[currentId].parent;
+                if (!nodeIds.has(currentId)) break;
+              }
+              return length;
+            };
+
+            let bestLeaf = candidates[0];
+            let bestScore = [chainLength(bestLeaf), leafTime(bestLeaf)];
+            for (let i = 1; i < candidates.length; i++) {
+              const score = [chainLength(candidates[i]), leafTime(candidates[i])];
+              if (
+                score[0] > bestScore[0] ||
+                (score[0] === bestScore[0] && score[1] > bestScore[1])
+              ) {
+                bestLeaf = candidates[i];
+                bestScore = score;
+              }
+            }
+
+            // Step 4 — paragen_variant_choice tiebreaker
+            const walkBack = (startNode) => {
+              const path = [];
+              let currentId = startNode.id;
+              const visited = new Set();
+              while (currentId && mapping[currentId] && !visited.has(currentId)) {
+                visited.add(currentId);
+                path.push(currentId);
+                const parent = mapping[currentId].parent;
+                if (!nodeIds.has(parent)) break;
+                currentId = parent;
+              }
+              path.reverse();
+              return path;
+            };
+
+            let pathIds = walkBack(bestLeaf);
+
+            const leafIds = new Set(leaves.map((node) => node.id));
+            for (let i = pathIds.length - 1; i >= 0; i--) {
+              const node = mapping[pathIds[i]] || {};
+              const msg = node.message || {};
+              if (msg.author?.role === "user") {
+                const choiceId = msg.metadata?.paragen_variant_choice;
+                if (choiceId && mapping[choiceId] && leafIds.has(choiceId)) {
+                  if (choiceId !== bestLeaf.id) {
+                    pathIds = walkBack(mapping[choiceId]);
+                  }
+                }
+                break;
+              }
+            }
+
+            // Step 5 — extract messages in order
+            const messages = [];
+            for (const nodeId of pathIds) {
+              const node = mapping[nodeId] || {};
+              if (node.message) messages.push(node.message);
+            }
+            return messages;
+          },
+
           async generateMarkdown(
             conv,
             zipContent,
@@ -1134,18 +1231,10 @@
             }
             md += "---\n\n";
 
-            const messages = [];
-            for (const key in conv.mapping || {}) {
-              const item = conv.mapping[key];
-              if (
-                item.message &&
-                !item.message.metadata?.is_visually_hidden_from_conversation
-              ) {
-                messages.push(item.message);
-              }
-            }
-            messages.sort(
-              (a, b) => (a.create_time || 0) - (b.create_time || 0),
+            // Extract messages in correct order via linked-list traversal.
+            // Sorting by create_time is unreliable — see traverseMapping() for details.
+            const messages = this.traverseMapping(conv.mapping).filter(
+              (msg) => !msg.metadata?.is_visually_hidden_from_conversation,
             );
 
             for (const msg of messages) {
