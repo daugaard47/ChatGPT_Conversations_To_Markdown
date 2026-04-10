@@ -350,6 +350,114 @@ def generate_frontmatter(title, create_time, update_time, config):
 
     return "\n".join(lines)
 
+def _traverse_mapping(mapping, n_candidates=5):
+    """
+    Traverse the conversation's linked-list structure to extract messages
+    in correct conversation order.
+
+    ChatGPT exports store conversations as a node graph (mapping dict) where
+    each node has parent/children pointers. Sorting by create_time is
+    unreliable — timestamps are assigned by server-side processing and can
+    be inverted relative to actual conversation order.
+
+    Strategy:
+      1. Find all leaf nodes (children: []).
+      2. Take the top N by update_time (fallback: create_time) — most recent
+         activity is most likely to be the live conversation end.
+      3. Among those, pick the one with the longest backward chain — the live
+         path is always deeper than abandoned branches (dead-ends terminate
+         early; the real conversation goes further).
+      4. paragen_variant_choice tiebreaker: if the walk reaches a user node
+         with paragen_variant_choice and that target is also a leaf, the
+         conversation ended at an A/B choice with neither branch continued —
+         defer to paragen_variant_choice as the user's stated selection.
+      5. Walk backward from the winning leaf via parent pointers to root,
+         reverse, and return messages in order.
+
+    Known limitation: if the user intentionally branched back to an early
+    point and the new path is shorter than a recently-abandoned longer path,
+    and both are in the top-N by recency, the longer abandoned path may win.
+    """
+    if not mapping:
+        return []
+
+    node_ids = set(mapping.keys())
+
+    # Step 1 — find all leaf nodes
+    leaves = [
+        node for node in mapping.values()
+        if isinstance(node, dict) and not node.get("children")
+    ]
+    if not leaves:
+        return []
+
+    # Step 2 — sort by update_time DESC (fallback: create_time), take top N
+    def _leaf_time(node):
+        msg = node.get("message") or {}
+        return msg.get("update_time") or msg.get("create_time") or 0
+
+    leaves.sort(key=_leaf_time, reverse=True)
+    candidates = leaves[:n_candidates]
+
+    # Step 3 — compute backward chain length for each candidate
+    def _chain_length(start_node):
+        length = 0
+        current_id = start_node.get("id")
+        visited = set()
+        while current_id and current_id in mapping and current_id not in visited:
+            visited.add(current_id)
+            length += 1
+            current_id = mapping[current_id].get("parent")
+            if current_id not in node_ids:
+                break
+        return length
+
+    best_leaf = max(candidates, key=lambda n: (_chain_length(n), _leaf_time(n)))
+
+    # Step 4 — paragen_variant_choice tiebreaker
+    # Walk backward to the first user node; if it has paragen_variant_choice
+    # and that target is also a leaf, use it (end-of-conversation A/B case).
+    def _walk_back(start_node):
+        """Walk parent pointers from start_node, return list of node IDs root→leaf."""
+        path = []
+        current_id = start_node.get("id")
+        visited = set()
+        while current_id and current_id in mapping and current_id not in visited:
+            visited.add(current_id)
+            path.append(current_id)
+            parent = mapping[current_id].get("parent")
+            if parent not in node_ids:
+                break
+            current_id = parent
+        path.reverse()
+        return path
+
+    path_ids = _walk_back(best_leaf)
+
+    leaf_ids = {node.get("id") for node in leaves}
+    for node_id in reversed(path_ids):
+        node = mapping.get(node_id, {})
+        msg = (node.get("message") or {})
+        if msg.get("author", {}).get("role") == "user":
+            choice_id = msg.get("metadata", {}).get("paragen_variant_choice")
+            if choice_id and choice_id in mapping and choice_id in leaf_ids:
+                # Both our current leaf and the preferred choice are dead-ends —
+                # end-of-conversation A/B; defer to the recorded selection.
+                if choice_id != best_leaf.get("id"):
+                    path_ids = _walk_back(mapping[choice_id])
+            break  # Only check the first user node
+
+    # Step 5 — extract messages in order
+    messages = []
+    for node_id in path_ids:
+        node = mapping.get(node_id, {})
+        msg = node.get("message")
+        if msg is not None:
+            messages.append(msg)
+
+    return messages
+
+
 def process_conversations(data, output_dir, config, input_base_path):
     """
     Process all conversations and generate markdown files.
@@ -369,21 +477,15 @@ def process_conversations(data, output_dir, config, input_base_path):
         update_time = entry.get("update_time", None)
         mapping = entry.get("mapping", {})
 
-        # Extract messages from the "mapping" key
-        messages = [
-            item["message"]
-            for item in mapping.values()
-            if isinstance(item, dict) and item.get("message") is not None
-        ]
+        # Extract messages in correct conversation order via linked-list traversal.
+        # Sorting by create_time is unreliable — see _traverse_mapping() for details.
+        messages = _traverse_mapping(mapping)
 
-        # Filter out system messages that are hidden
+        # Filter out system messages that are visually hidden
         messages = [
             msg for msg in messages
             if not msg.get("metadata", {}).get("is_visually_hidden_from_conversation", False)
         ]
-
-        # Sort messages by their create_time, handling None values
-        messages.sort(key=lambda x: x.get("create_time") or float('-inf'))
 
         # Use the first message to infer the title if it's not available
         inferred_title = _get_title(title, messages[0] if messages else None)
