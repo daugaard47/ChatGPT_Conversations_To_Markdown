@@ -241,6 +241,7 @@ def _get_message_content(message, input_base_path, output_base, config, conversa
     elif content_type == "reasoning_recap":
         # Handle reasoning recap messages
         recap_text = content_obj.get('content', 'Reasoning completed')
+        recap_text = recap_text.replace('\r\n', '\n').replace('\r', '\n')
         if config.get('use_obsidian_callouts', True):
             callout_type = config.get('reasoning_summary_callout_type', 'info')
             if callout_type:
@@ -259,7 +260,7 @@ def _get_message_content(message, input_base_path, output_base, config, conversa
         for thought in thoughts:
             if isinstance(thought, dict):
                 summary = thought.get('summary', 'Thought')
-                thought_content = thought.get('content', '')
+                thought_content = thought.get('content', '').replace('\r\n', '\n').replace('\r', '\n')
                 thought_lines.append(f"**{summary}**: {thought_content}")
 
         content = "\n".join(thought_lines)
@@ -272,8 +273,8 @@ def _get_message_content(message, input_base_path, output_base, config, conversa
 
     elif content_type == "user_editable_context":
         # Handle user context/profile messages
-        profile = content_obj.get("user_profile", "")
-        instructions = content_obj.get("user_instructions", "")
+        profile = content_obj.get("user_profile", "").replace('\r\n', '\n').replace('\r', '\n')
+        instructions = content_obj.get("user_instructions", "").replace('\r\n', '\n').replace('\r', '\n')
         content = f"*User Context*:\n{profile}\n{instructions}".strip()
         if config.get('use_obsidian_callouts', True):
             content = f"> [!abstract] User Context\n> " + content.replace("\n", "\n> ")
@@ -282,6 +283,7 @@ def _get_message_content(message, input_base_path, output_base, config, conversa
     elif content_type == "code":
         # Handle code content
         code_text = content_obj.get('text', content_obj.get('content', ''))
+        code_text = code_text.replace('\r\n', '\n').replace('\r', '\n')
         return f"```\n{code_text}\n```", []
 
     elif "text" in content_obj:
@@ -295,7 +297,7 @@ def _get_message_content(message, input_base_path, output_base, config, conversa
     else:
         # Unknown format, try to extract something useful
         if isinstance(content_obj, dict):
-            return str(content_obj.get('content', '')), []
+            return str(content_obj.get('content', '')).replace('\r\n', '\n').replace('\r', '\n'), []
         return "", []
 
 def _get_author_name(message, config):

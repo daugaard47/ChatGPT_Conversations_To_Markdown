@@ -956,6 +956,11 @@
             return `<pre><code>${escaped}</code></pre>`;
           },
 
+          // Normalize mixed \r\n / \r line endings to LF — cross-platform safe for Obsidian, Git, VS Code, etc.
+          normalizeLineEndings(text) {
+            return String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+          },
+
           // NEW: Load conversations from either legacy conversations.json or sharded conversations-###.json
           async loadConversationsFromZip(zipContent) {
             const allNames = Object.keys(zipContent.files);
@@ -1055,7 +1060,7 @@
                     videoFolder,
                     dalleFolder,
                   );
-                  this.outputZip.file(this.getConversationPath(conv), markdown);
+                  this.outputZip.file(this.getConversationPath(conv), this.normalizeLineEndings(markdown));
                 } catch (convError) {
                   console.error(
                     `Error processing conversation "${conv.title || "Untitled"}":`,
