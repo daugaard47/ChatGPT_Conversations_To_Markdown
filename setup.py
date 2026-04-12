@@ -184,6 +184,16 @@ def run_setup():
     config['message_separator'] = '\n\n'
     config['skip_empty_messages'] = True
     config['line_endings'] = 'native'
+    config['reasoning_callout_type'] = 'note'
+    config['reasoning_callout_state'] = 'static'
+    config['reasoning_summary_callout_type'] = 'info'
+    config['reasoning_summary_callout_state'] = 'static'
+    config['prompt_callout_type'] = ''
+    config['response_callout_type'] = ''
+    config['tool_callout_type'] = ''
+    config['tool_callout_state'] = 'static'
+    config['timestamp_tag'] = 'sub'
+    config['timestamp_position'] = 'header'
 
     # Save config
     config_path = Path('config.json')

@@ -163,6 +163,46 @@ The `line_endings` key controls the line ending style written to `.md` files:
 
 > **Note:** `lf` is recommended for Obsidian vaults that are synced or version-controlled, as it avoids platform-specific diffs.
 
+### Message Formatting Options
+
+These options control how message headers, callouts, and timestamps are rendered. All defaults preserve the original output behavior — none of these need to be set unless you want to change something.
+
+#### Author Names
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `assistant_name` | `"ChatGPT"` | Display name for assistant messages. Set to `""` to suppress the assistant header entirely. |
+
+`user_name` (set during setup) behaves the same way — set to `""` to suppress the user header.
+
+#### Callout Types
+
+When `use_obsidian_callouts` is enabled, internal reasoning and reasoning summary blocks are rendered as Obsidian callouts. These options let you change the callout type or disable the callout entirely.
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `reasoning_callout_type` | `"note"` | Callout type for internal reasoning blocks. `""` = plain bold header instead. |
+| `reasoning_callout_state` | `"static"` | `"collapsed"` (closed by default) or `"expanded"` (open, collapsible) |
+| `reasoning_summary_callout_type` | `"info"` | Callout type for reasoning summary blocks. `""` = plain bold header instead. |
+| `reasoning_summary_callout_state` | `"static"` | `"collapsed"` or `"expanded"` |
+| `prompt_callout_type` | `""` | Wrap user prompts in a callout of this type. `""` = plain bold header (default). |
+| `response_callout_type` | `""` | Wrap assistant responses in a callout of this type. `""` = plain bold header (default). |
+| `tool_callout_type` | `""` | Wrap tool output in a callout of this type. `""` = plain bold header (default). |
+| `tool_callout_state` | `"static"` | `"collapsed"` or `"expanded"` |
+
+When a callout is used for a message, the callout title serves as the author header — no separate bold header is written.
+
+**Obsidian custom callout types** allow you to style each block independently with a CSS snippet. For example, setting `prompt_callout_type` to `"ai-prompt"` and targeting `[data-callout="ai-prompt"]` in CSS lets you style user prompts to look like chat bubbles. Setting a callout type and using `display: none` in CSS is also a clean way to hide sections (such as tool output) without removing them from the file.
+
+#### Timestamps
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `timestamp_tag` | `"sub"` | HTML tag wrapping the timestamp. `"time"` for semantic markup, `""` for no tag. |
+| `timestamp_position` | `"header"` | `"header"` places the timestamp on the line after the author header. `"footer"` places it after the message body. |
+
+Timestamps stay attached to their message block regardless of position — including inside callout blocks when `"footer"` is used.
+
 ## 📥 Getting Your ChatGPT Data
 
 1. Go to [ChatGPT Settings](https://chatgpt.com/settings) → **Data Controls**
