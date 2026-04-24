@@ -187,7 +187,7 @@ When `use_obsidian_callouts` is enabled, internal reasoning and reasoning summar
 | `reasoning_summary_callout_state` | `"static"` | `"collapsed"` or `"expanded"` |
 | `prompt_callout_type` | `""` | Wrap user prompts in a callout of this type. `""` = plain bold header (default). |
 | `response_callout_type` | `""` | Wrap assistant responses in a callout of this type. `""` = plain bold header (default). |
-| `tool_callout_type` | `""` | Wrap tool output in a callout of this type. `""` = plain bold header (default). |
+| `tool_callout_type` | `""` | Wrap all tool-related messages in a callout of this type. `""` = plain bold header (default). |
 | `tool_callout_state` | `"static"` | `"collapsed"` or `"expanded"` |
 
 When a callout is used for a message, the callout title serves as the author header — no separate bold header is written.
