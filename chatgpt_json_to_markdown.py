@@ -634,6 +634,9 @@ def process_conversations(data, output_dir, config, input_base_path):
                         msg_callout_type = ''
                         msg_callout_state = 'static'
 
+                    if not config.get('use_obsidian_callouts', True):
+                        msg_callout_type = ''
+
                     if msg_callout_type:
                         # Prompt/response/tool callout mode: author name is the callout title.
                         collapse = _callout_collapse_marker(msg_callout_state)
