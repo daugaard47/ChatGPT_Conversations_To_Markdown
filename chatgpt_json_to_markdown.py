@@ -129,7 +129,75 @@ def copy_attachment(src_path, output_base, file_type, filename, config, conversa
     rel_path = get_relative_asset_path(conversation_path, target_path)
     return rel_path
 
-def _process_message_parts(parts, input_base_path, output_base, config, conversation_path):
+def _find_content_reference_for_queries(queries, content_references):
+    """
+    Locate the content_reference whose images match the given query list.
+    Tests queries in order, returning as soon as one narrows candidates to one.
+    Falls back to the first remaining match.
+    """
+    if not queries or not content_references:
+        return None
+    remaining = list(content_references)
+    for query in queries:
+        matches = [
+            cr for cr in remaining
+            if any(img.get('image_search_query') == query for img in cr.get('images', []))
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        if matches:
+            remaining = matches
+    return remaining[0] if remaining else None
+
+
+def _render_image_group(content_reference, config=None):
+    """Return markdown image lines for all images in a content_reference."""
+    parts = []
+    for img in content_reference.get('images', []):
+        result = img.get('image_result', {})
+        title = (result.get('title') or 'Image').replace(']', '\\]')
+        url = result.get('content_url', '')
+        if url:
+            parts.append(f"![{title}]({url})")
+
+    if config and config.get('use_obsidian_callouts') and config.get('image_group_callout_type'):
+        callout_type = config['image_group_callout_type']
+        collapse = _callout_collapse_marker(config.get('image_group_callout_state', 'static'))
+        header = f"> [!{callout_type}]{collapse} Image Group"
+        body = "\n> \n> ".join(parts)
+        return f"{header}\n> {body}"
+
+    return "\n\n".join(parts)
+
+
+def _resolve_image_groups(text, content_references, config=None):
+    """
+    Replace image_group markers in text with markdown images sourced from
+    content_references. Markers have the form:
+        \ue200image_group\ue202{json}\ue201
+    """
+    if not content_references:
+        return text
+    image_group_refs = [cr for cr in content_references if cr.get('type') == 'image_group']
+    if not image_group_refs:
+        return text
+    pattern = re.compile('\ue200image_group\ue202(.*?)\ue201', re.DOTALL)
+
+    def replace(m):
+        try:
+            data = json.loads(m.group(1))
+        except (json.JSONDecodeError, ValueError):
+            return m.group(0)
+        queries = data.get('query', [])
+        if isinstance(queries, str):
+            queries = [queries]
+        cr = _find_content_reference_for_queries(queries, image_group_refs)
+        return _render_image_group(cr, config) if cr else m.group(0)
+
+    return pattern.sub(replace, text)
+
+
+def _process_message_parts(parts, input_base_path, output_base, config, conversation_path, content_references=None):
     """
     Process message parts, handling both text and image_asset_pointer types.
     Returns: (formatted_content, list_of_attachment_paths)
@@ -142,8 +210,8 @@ def _process_message_parts(parts, input_base_path, output_base, config, conversa
 
     for part in parts:
         if isinstance(part, str):
-            # Regular text content
-            content_pieces.append(part)
+            # Regular text content — resolve any inline image_group markers first
+            content_pieces.append(_resolve_image_groups(part, content_references, config) if content_references else part)
         elif isinstance(part, dict):
             content_type = part.get('content_type', '')
 
@@ -236,7 +304,8 @@ def _get_message_content(message, input_base_path, output_base, config, conversa
 
     if "parts" in content_obj:
         parts = content_obj["parts"]
-        return _process_message_parts(parts, input_base_path, output_base, config, conversation_path)
+        content_refs = message.get('metadata', {}).get('content_references') or []
+        return _process_message_parts(parts, input_base_path, output_base, config, conversation_path, content_refs)
 
     elif content_type == "reasoning_recap":
         # Handle reasoning recap messages

@@ -192,6 +192,8 @@ def run_setup():
     config['response_callout_type'] = ''
     config['tool_callout_type'] = ''
     config['tool_callout_state'] = 'static'
+    config['image_group_callout_type'] = 'image_group'
+    config['image_group_callout_state'] = 'static'
     config['timestamp_tag'] = 'sub'
     config['timestamp_position'] = 'header'
 
