@@ -189,6 +189,8 @@ When `use_obsidian_callouts` is enabled, internal reasoning and reasoning summar
 | `response_callout_type` | `""` | Wrap assistant responses in a callout of this type. `""` = plain bold header (default). |
 | `tool_callout_type` | `""` | Wrap tool output in a callout of this type. `""` = plain bold header (default). |
 | `tool_callout_state` | `"static"` | `"collapsed"` or `"expanded"` |
+| `image_group_callout_type` | `"image_group"` | Wrap inline web image groups in a callout. `""` = images rendered inline with no wrapper. |
+| `image_group_callout_state` | `"static"` | `"collapsed"` or `"expanded"` |
 
 When a callout is used for a message, the callout title serves as the author header — no separate bold header is written.
 

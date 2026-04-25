@@ -29,6 +29,8 @@
   "response_callout_type": "",
   "tool_callout_type": "",
   "tool_callout_state": "static",
+  "image_group_callout_type": "image_group",
+  "image_group_callout_state": "static",
   "timestamp_tag": "sub",
   "timestamp_position": "header"
 }
