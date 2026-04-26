@@ -7,9 +7,18 @@ import re
 from datetime import datetime
 try:
     from tqdm import tqdm
+    _tqdm_available = True
+    _tqdm_write = tqdm.write
 except ImportError:
+    _tqdm_available = False
     def tqdm(iterable, **kwargs):
         return iterable
+    _tqdm_write = print
+try:
+    import requests as _requests
+    _requests_available = True
+except ImportError:
+    _requests_available = False
 from pathlib import Path
 from organize import get_conversation_path, get_asset_path, get_relative_asset_path
 
@@ -129,6 +138,102 @@ def copy_attachment(src_path, output_base, file_type, filename, config, conversa
     rel_path = get_relative_asset_path(conversation_path, target_path)
     return rel_path
 
+_CONTENT_TYPE_TO_EXT = {
+    'image/jpeg': 'jpg',
+    'image/jpg':  'jpg',
+    'image/png':  'png',
+    'image/webp': 'webp',
+    'image/gif':  'gif',
+    'image/avif': 'avif',
+}
+
+def _ext_from_content_type(content_type):
+    """Return a file extension for a Content-Type header value, or None."""
+    mime = content_type.split(';')[0].strip().lower()
+    return _CONTENT_TYPE_TO_EXT.get(mime)
+
+def _ext_from_url(url):
+    """Guess extension from a URL path, or None."""
+    path = url.split('?')[0].rstrip('/')
+    suffix = Path(path).suffix.lstrip('.').lower()
+    return suffix if suffix in _CONTENT_TYPE_TO_EXT.values() else None
+
+def _sanitize_image_title(title, max_len=60):
+    """Return a filesystem-safe slug from an image title."""
+    slug = re.sub(r'[^\w\s-]', '', title or '').strip()
+    slug = re.sub(r'[\s-]+', '_', slug)
+    return slug[:max_len] or 'image'
+
+def _download_web_image(url, title, image_index, conv_id, output_base, conversation_path, config):
+    """
+    Download a single web image to the images asset directory and return its relative path.
+    Returns None if download is disabled, requests is unavailable, or the fetch fails.
+    Falls back to the remote URL on any failure so the markdown remains usable.
+    """
+    if not config.get('download_web_images', False):
+        return None
+    if not _requests_available:
+        return None
+
+    sanitized = _sanitize_image_title(title)
+    asset_dir = get_asset_path(output_base, 'image', config)
+    asset_dir.mkdir(parents=True, exist_ok=True)
+
+    # Skip the network request entirely if already downloaded (any extension)
+    existing = list(asset_dir.glob(f"{conv_id}_{image_index:02d}_{sanitized}.*"))
+    if existing:
+        _record_image_download(existing[0].name)
+        return get_relative_asset_path(conversation_path, existing[0])
+
+    try:
+        response = _requests.get(url, timeout=20)
+        response.raise_for_status()
+        ext = _ext_from_content_type(response.headers.get('Content-Type', ''))
+        image_data = response.content
+    except Exception as e:
+        _tqdm_write(f"  ❌ Failed to download '{title}': {e}")
+        return None
+
+    if not ext:
+        ext = _ext_from_url(url) or 'jpg'
+
+    filename = f"{conv_id}_{image_index:02d}_{sanitized}.{ext}"
+    target_path = asset_dir / filename
+    with open(target_path, 'wb') as f:
+        f.write(image_data)
+
+    _record_image_download(filename)
+    return get_relative_asset_path(conversation_path, target_path)
+
+
+_image_pbar = None
+
+
+def _record_image_download(filename):
+    """Create or update the nested image-download progress bar (one per conversation)."""
+    global _image_pbar
+    if not _tqdm_available:
+        return
+    cols = shutil.get_terminal_size().columns
+    # prefix "  🖼️ " ≈ 6 visual cols; suffix ": NNN img [HH:MM, NN.NN img/s]" ≈ 35 cols
+    max_name = max(10, cols - 41)
+    if len(filename) > max_name:
+        filename = filename[:max_name - 3] + "..."
+    if _image_pbar is None:
+        _image_pbar = tqdm(desc=f"  🖼️ {filename}", unit=" img", leave=False)
+    else:
+        _image_pbar.set_description(f"  🖼️ {filename}")
+    _image_pbar.update(1)
+
+
+def _close_image_pbar():
+    """Close and erase the nested image-download progress bar."""
+    global _image_pbar
+    if _image_pbar is not None:
+        _image_pbar.close()
+        _image_pbar = None
+
+
 def _find_content_reference_for_queries(queries, content_references):
     """
     Locate the content_reference whose images match the given query list.
@@ -150,15 +255,22 @@ def _find_content_reference_for_queries(queries, content_references):
     return remaining[0] if remaining else None
 
 
-def _render_image_group(content_reference, config=None):
+def _render_image_group(content_reference, config=None, conv_id=None, output_base=None, conversation_path=None, image_counter=None):
     """Return markdown image lines for all images in a content_reference."""
     parts = []
     for img in content_reference.get('images', []):
         result = img.get('image_result', {})
-        title = (result.get('title') or 'Image').replace(']', '\\]')
+        title = result.get('title') or 'Image'
         url = result.get('content_url', '')
-        if url:
-            parts.append(f"![{title}]({url})")
+        if not url:
+            continue
+        image_index = 0
+        if image_counter is not None:
+            image_index = image_counter[0]
+            image_counter[0] += 1
+        local_path = _download_web_image(url, title, image_index, conv_id, output_base, conversation_path, config)
+        embed_url = local_path if local_path else url
+        parts.append(f"![{title.replace(']', chr(92) + ']')}]({embed_url})")
 
     if config and config.get('use_obsidian_callouts') and config.get('image_group_callout_type'):
         callout_type = config['image_group_callout_type']
@@ -170,7 +282,7 @@ def _render_image_group(content_reference, config=None):
     return "\n\n".join(parts)
 
 
-def _resolve_image_groups(text, content_references, config=None):
+def _resolve_image_groups(text, content_references, config=None, conv_id=None, output_base=None, conversation_path=None, image_counter=None):
     """
     Replace image_group markers in text with markdown images sourced from
     content_references. Markers have the form:
@@ -192,12 +304,12 @@ def _resolve_image_groups(text, content_references, config=None):
         if isinstance(queries, str):
             queries = [queries]
         cr = _find_content_reference_for_queries(queries, image_group_refs)
-        return _render_image_group(cr, config) if cr else m.group(0)
+        return _render_image_group(cr, config, conv_id, output_base, conversation_path, image_counter) if cr else m.group(0)
 
     return pattern.sub(replace, text)
 
 
-def _process_message_parts(parts, input_base_path, output_base, config, conversation_path, content_references=None):
+def _process_message_parts(parts, input_base_path, output_base, config, conversation_path, content_references=None, conv_id=None, image_counter=None):
     """
     Process message parts, handling both text and image_asset_pointer types.
     Returns: (formatted_content, list_of_attachment_paths)
@@ -211,7 +323,7 @@ def _process_message_parts(parts, input_base_path, output_base, config, conversa
     for part in parts:
         if isinstance(part, str):
             # Regular text content — resolve any inline image_group markers first
-            content_pieces.append(_resolve_image_groups(part, content_references, config) if content_references else part)
+            content_pieces.append(_resolve_image_groups(part, content_references, config, conv_id, output_base, conversation_path, image_counter) if content_references else part)
         elif isinstance(part, dict):
             content_type = part.get('content_type', '')
 
@@ -293,7 +405,7 @@ def _callout_collapse_marker(state):
         return '+'
     return ''
 
-def _get_message_content(message, input_base_path, output_base, config, conversation_path):
+def _get_message_content(message, input_base_path, output_base, config, conversation_path, conv_id=None, image_counter=None):
     """
     Extracts the content of a message from the message object,
     with handling for various content types including multimodal (images).
@@ -305,7 +417,7 @@ def _get_message_content(message, input_base_path, output_base, config, conversa
     if "parts" in content_obj:
         parts = content_obj["parts"]
         content_refs = message.get('metadata', {}).get('content_references') or []
-        return _process_message_parts(parts, input_base_path, output_base, config, conversation_path, content_refs)
+        return _process_message_parts(parts, input_base_path, output_base, config, conversation_path, content_refs, conv_id, image_counter)
 
     elif content_type == "reasoning_recap":
         # Handle reasoning recap messages
@@ -617,6 +729,10 @@ def process_conversations(data, output_dir, config, input_base_path):
         file_name = f"{file_stem}.md"
         file_path = conversation_dir / file_name
 
+        # Per-conversation counter for downloaded web images — ensures unique, ordered filenames.
+        # None when download_web_images is disabled so no counter logic runs in the call chain.
+        image_counter = [0] if config.get('download_web_images', False) else None
+
         # Write messages to file
         newline = {'lf': '\n', 'crlf': '\r\n'}.get(config.get('line_endings', 'native'))
         with open(file_path, "w", encoding="utf-8", newline=newline) as f:
@@ -649,7 +765,9 @@ def process_conversations(data, output_dir, config, input_base_path):
                     input_base,
                     output_base,
                     config,
-                    file_path
+                    file_path,
+                    id_short,
+                    image_counter
                 )
                 author_name = _get_author_name(message, config)
 
@@ -760,6 +878,8 @@ def process_conversations(data, output_dir, config, input_base_path):
 
                     f.write(f"{block}{config['message_separator']}")
 
+        _close_image_pbar()
+
 def migrate_config(config, config_path):
     """Migrate config.json to the latest version, saving changes back to disk."""
     version = config.get('version', 1)
@@ -784,6 +904,7 @@ def migrate_config(config, config_path):
     return config
 
 def main():
+    print()
     config_path = Path("config.json")
 
     if not config_path.exists():
@@ -793,6 +914,15 @@ def main():
 
     config = read_json_file(config_path)
     config = migrate_config(config, config_path)
+
+    if config.get('download_web_images', False) and not _requests_available:
+        print("🛠  download_web_images is enabled but the 'requests' package is not installed.")
+        print("   Run: pip install requests")
+        print("   Images will be linked from their original URLs instead.")
+        print()
+    elif config.get('download_web_images', False):
+        print("🐌 Web image downloads are enabled — conversion will be significantly slower.")
+        print()
 
     # Validate file_name_format tokens before processing begins
     try:
