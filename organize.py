@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -135,15 +136,9 @@ def get_relative_asset_path(conversation_path, asset_path):
     conversation_path = Path(conversation_path)
     asset_path = Path(asset_path)
 
-    # Calculate relative path from conversation file to asset
-    try:
-        rel_path = asset_path.relative_to(conversation_path.parent.parent)
-        return str(rel_path).replace('\\', '/')  # Use forward slashes for markdown
-    except ValueError:
-        # If relative path fails, try using os.path.relpath
-        import os
-        rel = os.path.relpath(asset_path, conversation_path.parent)
-        return rel.replace('\\', '/')
+    # Relative path from the conversation file's directory to the asset
+    rel = os.path.relpath(asset_path, conversation_path.parent)
+    return rel.replace('\\', '/')
 
 def create_organization_summary(conversations, config, output_base):
     """
