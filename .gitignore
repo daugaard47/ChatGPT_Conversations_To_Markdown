@@ -170,3 +170,6 @@ MarkdownFiles/
 config.json
 CLAUDE.md
 .claude/
+
+# Git Bash crash dumps (Windows)
+*.stackdump
