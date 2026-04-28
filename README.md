@@ -205,6 +205,16 @@ When a callout is used for a message, the callout title serves as the author hea
 
 Timestamps stay attached to their message block regardless of position — including inside callout blocks when `"footer"` is used.
 
+#### Web Image Downloads
+
+When ChatGPT responses include web image search results, the images are embedded by default as remote URLs pointing to OpenAI's CDN. These URLs may become unavailable if the source conversation is deleted. Setting `download_web_images` to `true` downloads each image to `Assets/Images/` at conversion time and rewrites the markdown links to use the local copies.
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `download_web_images` | `false` | Download CDN-hosted web images to `Assets/Images/` at conversion time. Requires `requests` (`pip install requests`). Falls back to the remote URL if a download fails. |
+
+Downloaded files are named `{conversation_id}_{index}_{title}.{ext}`, where `conversation_id` is the same 8-character prefix used in the markdown filename, making it easy to find all images associated with a given conversation.
+
 ## 📥 Getting Your ChatGPT Data
 
 1. Go to [ChatGPT Settings](https://chatgpt.com/settings) → **Data Controls**

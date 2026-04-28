@@ -31,6 +31,7 @@
   "tool_callout_state": "static",
   "image_group_callout_type": "image_group",
   "image_group_callout_state": "static",
+  "download_web_images": false,
   "timestamp_tag": "sub",
   "timestamp_position": "header"
 }
