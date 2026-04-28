@@ -320,9 +320,9 @@ def _get_author_name(message, config):
     # Tool call detection
     if content_type == "code":
         if recipient == "web":
-            return f"{base_name} (tool call)"
+            return "Tool Call"
         elif recipient == "web.run":
-            return f"{base_name} (tool execution)"
+            return "Tool Execution"
 
     # Other special content types
     if "thoughts" in content:
@@ -588,6 +588,7 @@ def process_conversations(data, output_dir, config, input_base_path):
                 # headers and must not be wrapped by response_callout_type.
                 msg_content = message.get("content", {})
                 msg_content_type = msg_content.get("content_type", "")
+                msg_recipient = message.get("recipient", "")
                 is_reasoning = "thoughts" in msg_content
                 is_recap = msg_content_type == "reasoning_recap"
 
@@ -625,6 +626,12 @@ def process_conversations(data, output_dir, config, input_base_path):
                         msg_callout_type = config.get('prompt_callout_type', '')
                         msg_callout_state = 'static'
                     elif author_role == "tool":
+                        msg_callout_type = config.get('tool_callout_type', '')
+                        msg_callout_state = config.get('tool_callout_state', 'static')
+                    elif author_role == "assistant" and msg_content_type == "code" and msg_recipient == "web":
+                        msg_callout_type = config.get('tool_callout_type', '')
+                        msg_callout_state = config.get('tool_callout_state', 'static')
+                    elif author_role == "assistant" and msg_content_type == "code" and msg_recipient == "web.run":
                         msg_callout_type = config.get('tool_callout_type', '')
                         msg_callout_state = config.get('tool_callout_state', 'static')
                     elif author_role == "assistant" and not (is_reasoning or is_recap):
